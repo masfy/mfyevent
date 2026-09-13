@@ -56,6 +56,57 @@ export const syncUserToFirestore = async (user: User): Promise<boolean> => {
 };
 
 /**
+ * Membersihkan duplikasi pengguna berdasarkan email (khususnya akun template vs akun Google Auth asli)
+ */
+export const deduplicateUsers = (users: User[], db?: any): User[] => {
+  const seenEmails = new Map<string, User>();
+  const duplicatesToRemove: string[] = [];
+
+  for (const user of users) {
+    const emailKey = user.email.trim().toLowerCase();
+    if (!emailKey) {
+      seenEmails.set(user.uid, user);
+      continue;
+    }
+
+    if (seenEmails.has(emailKey)) {
+      const existing = seenEmails.get(emailKey)!;
+      // Jika salah satu adalah template 'usr_alfyarnaim_admin' dan yang lain adalah UID Firebase asli,
+      // utamakan yang asli dari Google Auth
+      if (existing.uid === 'usr_alfyarnaim_admin' && user.uid !== 'usr_alfyarnaim_admin') {
+        duplicatesToRemove.push(existing.uid);
+        seenEmails.set(emailKey, user);
+      } else if (user.uid === 'usr_alfyarnaim_admin') {
+        duplicatesToRemove.push(user.uid);
+      } else {
+        // Jika keduanya non-template, pertahankan yang paling baru
+        const existingDate = new Date(existing.updatedAt || existing.createdAt).getTime();
+        const userDate = new Date(user.updatedAt || user.createdAt).getTime();
+        if (userDate > existingDate) {
+          seenEmails.set(emailKey, user);
+        }
+      }
+    } else {
+      seenEmails.set(emailKey, user);
+    }
+  }
+
+  // Hapus dokumen duplikat dari Firestore secara otomatis di latar belakang jika ada
+  if (db && duplicatesToRemove.length > 0) {
+    duplicatesToRemove.forEach(async (uid) => {
+      try {
+        await deleteDoc(doc(db, 'users', uid));
+        console.log(`[Deduplicate] Menghapus akun template duplikat dari Firestore: ${uid}`);
+      } catch (e) {
+        console.warn('Gagal menghapus duplikat dari Firestore:', e);
+      }
+    });
+  }
+
+  return Array.from(seenEmails.values());
+};
+
+/**
  * Mengambil seluruh daftar pengguna dari Cloud Firestore
  */
 export const fetchUsersFromFirestore = async (): Promise<User[]> => {
@@ -90,9 +141,11 @@ export const fetchUsersFromFirestore = async (): Promise<User[]> => {
       });
     });
 
-    if (cloudUsers.length > 0) {
-      saveStoredUsers(cloudUsers);
-      return cloudUsers;
+    const uniqueUsers = deduplicateUsers(cloudUsers, db);
+
+    if (uniqueUsers.length > 0) {
+      saveStoredUsers(uniqueUsers);
+      return uniqueUsers;
     }
 
     return getStoredUsers();
@@ -138,9 +191,11 @@ export const subscribeUsersFromFirestore = (
             });
           });
 
-          if (cloudUsers.length > 0) {
-            saveStoredUsers(cloudUsers);
-            onUsersUpdate(cloudUsers);
+          const uniqueUsers = deduplicateUsers(cloudUsers, db);
+
+          if (uniqueUsers.length > 0) {
+            saveStoredUsers(uniqueUsers);
+            onUsersUpdate(uniqueUsers);
           }
         }
       },

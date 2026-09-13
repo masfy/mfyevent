@@ -124,7 +124,15 @@ export const getStoredUsers = (): User[] => {
       localStorage.setItem(STORAGE_KEYS.USERS_LIST, JSON.stringify(INITIAL_USERS_LIST));
       return INITIAL_USERS_LIST;
     }
-    return JSON.parse(data);
+    const parsed: User[] = JSON.parse(data);
+    // De-duplicate: jika sudah ada akun Google asli Mas Alfy, bersihkan template 'usr_alfyarnaim_admin'
+    const alfyAccounts = parsed.filter((u) => u.email.toLowerCase() === 'alfyarnaim@gmail.com');
+    if (alfyAccounts.length > 1) {
+      const cleaned = parsed.filter((u) => u.uid !== 'usr_alfyarnaim_admin');
+      localStorage.setItem(STORAGE_KEYS.USERS_LIST, JSON.stringify(cleaned));
+      return cleaned;
+    }
+    return parsed;
   } catch {
     return INITIAL_USERS_LIST;
   }
