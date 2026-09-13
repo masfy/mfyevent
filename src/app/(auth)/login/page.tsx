@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/ui/BrandLogo';
-import { ArrowRight, Lock, Mail, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Lock, Mail, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
-import { setAuthSession } from '@/lib/storage';
+import { setAuthSession, getStoredUsers, saveStoredUsers, saveStoredUser } from '@/lib/storage';
+import { PRIMARY_ADMIN_EMAIL } from '@/lib/firebase/config';
 import { SimpleCaptcha } from '@/components/ui/SimpleCaptcha';
 import { signInWithGoogle } from '@/lib/firebase/auth';
 import { useTheme } from '@/context/ThemeContext';
@@ -15,13 +16,23 @@ export default function LoginPage() {
   const router = useRouter();
   const { showToast } = useToast();
   const { isDark } = useTheme();
-  const [email, setEmail] = useState('alfyarnaim@gmail.com');
-  const [password, setPassword] = useState('••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
   const [captchaError, setCaptchaError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [idleTimeoutNotice, setIdleTimeoutNotice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('reason') === 'idle_timeout') {
+        setIdleTimeoutNotice(true);
+      }
+    }
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -65,11 +76,40 @@ export default function LoginPage() {
     setCaptchaError(false);
     setLoading(true);
 
+    const userEmail = email.trim().toLowerCase();
+    const isPrimaryAdmin = userEmail === PRIMARY_ADMIN_EMAIL.trim().toLowerCase();
+    const users = getStoredUsers();
+    let targetUser = users.find((u) => u.email.toLowerCase() === userEmail);
+
+    if (!targetUser) {
+      targetUser = {
+        uid: `usr_${Date.now()}`,
+        email: userEmail,
+        emailVerified: true,
+        displayName: isPrimaryAdmin ? 'Alfy Arnaim' : userEmail.split('@')[0],
+        username: userEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') || `user${Date.now().toString().slice(-4)}`,
+        photoURL: isPrimaryAdmin
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        role: isPrimaryAdmin ? 'SUPER_ADMIN' : 'USER',
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        shortLinksCount: 0,
+        micrositesCount: 0,
+      };
+      saveStoredUsers([targetUser, ...users]);
+    }
+
+    saveStoredUser(targetUser);
+    setAuthSession(true);
+
     setTimeout(() => {
       setLoading(false);
-      setAuthSession(true);
-      showToast('Berhasil masuk! Mengalihkan ke dashboard...');
-      router.push('/dashboard');
+      showToast(`Berhasil masuk sebagai ${targetUser.displayName}!`);
+      const targetRoute = targetUser.role === 'ADMIN' || targetUser.role === 'SUPER_ADMIN' ? '/admin/dashboard' : '/member/dashboard';
+      router.push(targetRoute);
     }, 600);
   };
 
@@ -138,6 +178,18 @@ export default function LoginPage() {
               Masuk untuk mengelola link dan microsite Anda
             </p>
           </div>
+
+          {idleTimeoutNotice && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5 shadow-xs animate-in fade-in">
+              <span className="text-base leading-none shrink-0">⏱️</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Sesi Anda Telah Berakhir</p>
+                <p className="text-[11px] opacity-90 leading-relaxed">
+                  Sistem secara otomatis mengeluarkan akun Anda setelah 27 menit tidak ada aktivitas demi menjaga keamanan. Silakan masuk kembali.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ================= GOOGLE SIGN-IN BUTTON ================= */}
           <div className="space-y-3">

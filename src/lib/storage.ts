@@ -12,7 +12,7 @@ const STORAGE_KEYS = {
   AUDIT: 'mfy_event_audit',
 };
 
-const MOCK_CLEANUP_VERSION = 'mfy_clean_data_v2';
+const MOCK_CLEANUP_VERSION = 'mfy_auth_clean_v3';
 
 /**
  * Otomatis membersihkan sisa mock data dari LocalStorage peramban
@@ -60,16 +60,10 @@ export const checkAndCleanLegacyMockData = () => {
         localStorage.setItem(STORAGE_KEYS.USERS_LIST, JSON.stringify([INITIAL_USER]));
       }
 
-      // 5. Bersihkan user aktif saat ini jika masih menyimpan data dummy
-      const rawUser = localStorage.getItem(STORAGE_KEYS.USER);
-      if (rawUser) {
-        const parsedUser: User = JSON.parse(rawUser);
-        if (parsedUser.shortLinksCount === 12 || parsedUser.displayName.includes('(Super Admin)')) {
-          parsedUser.displayName = parsedUser.displayName.replace(' (Super Admin)', '');
-          parsedUser.shortLinksCount = 0;
-          parsedUser.micrositesCount = 0;
-          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(parsedUser));
-        }
+      // 5. Pastikan pengunjung yang belum login TIDAK mendapatkan akses Super Admin otomatis
+      const isLoggedIn = localStorage.getItem('mfy_event_logged_in') === 'true';
+      if (!isLoggedIn) {
+        localStorage.removeItem(STORAGE_KEYS.USER);
       }
 
       localStorage.setItem('mfy_mock_data_cleaned', MOCK_CLEANUP_VERSION);
@@ -142,18 +136,41 @@ export const saveStoredUsers = (users: User[]) => {
   window.dispatchEvent(new Event('mfy_storage_update'));
 };
 
+export const GUEST_USER: User = {
+  uid: 'usr_guest',
+  email: '',
+  emailVerified: false,
+  displayName: 'Pengunjung',
+  username: 'guest',
+  photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  role: 'USER',
+  status: 'ACTIVE',
+  createdAt: '2026-09-01T00:00:00Z',
+  updatedAt: new Date().toISOString(),
+  lastLoginAt: new Date().toISOString(),
+  shortLinksCount: 0,
+  micrositesCount: 0,
+};
+
 export const getStoredUser = (): User => {
-  if (typeof window === 'undefined') return INITIAL_USER;
+  if (typeof window === 'undefined') return GUEST_USER;
   checkAndCleanLegacyMockData();
   try {
+    if (!isUserLoggedIn()) {
+      return GUEST_USER;
+    }
     const data = localStorage.getItem(STORAGE_KEYS.USER);
     if (!data) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(INITIAL_USER));
-      return INITIAL_USER;
+      return GUEST_USER;
     }
-    return JSON.parse(data);
+    const parsed: User = JSON.parse(data);
+    // Role protection: only primary admin email can hold SUPER_ADMIN
+    if (parsed.role === 'SUPER_ADMIN' && parsed.email.trim().toLowerCase() !== 'alfyarnaim@gmail.com') {
+      parsed.role = 'USER';
+    }
+    return parsed;
   } catch {
-    return INITIAL_USER;
+    return GUEST_USER;
   }
 };
 
@@ -233,13 +250,19 @@ export const switchActiveUser = (uid: string): User => {
 };
 
 export const isUserLoggedIn = (): boolean => {
-  if (typeof window === 'undefined') return true;
-  return localStorage.getItem('mfy_event_logged_in') !== 'false';
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('mfy_event_logged_in') === 'true';
 };
 
 export const setAuthSession = (loggedIn: boolean) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem('mfy_event_logged_in', loggedIn ? 'true' : 'false');
+  if (!loggedIn) {
+    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem('mfy_last_activity');
+  } else {
+    localStorage.setItem('mfy_last_activity', Date.now().toString());
+  }
   window.dispatchEvent(new Event('mfy_storage_update'));
 };
 

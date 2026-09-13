@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ShieldCheck,
   Users,
@@ -40,7 +41,9 @@ import {
   addAuditLog,
   getStoredLinks,
   getStoredMicrosites,
+  isUserLoggedIn,
 } from '@/lib/storage';
+import { isUserAdmin } from '@/lib/quota';
 import {
   syncUserToFirestore,
   fetchUsersFromFirestore,
@@ -54,6 +57,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const { showToast } = useToast();
   const [currentUser, setCurrentUser] = useState<User>(INITIAL_USER);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -91,7 +95,8 @@ export default function AdminDashboardPage() {
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   const loadAdminData = () => {
-    setCurrentUser(getStoredUser());
+    const user = getStoredUser();
+    setCurrentUser(user);
     setAllUsers(getStoredUsers());
     setReports(getStoredReports());
     setAuditLogs(getStoredAuditLogs());
@@ -100,6 +105,18 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
+    // 0. Strict RBAC Guard: Hanya Admin / Super Admin yang berhak melihat halaman ini
+    if (!isUserLoggedIn()) {
+      router.replace('/login');
+      return;
+    }
+    const user = getStoredUser();
+    if (!isUserAdmin(user)) {
+      showToast('Akses ditolak: Anda tidak memiliki izin Administrator.', 'error');
+      router.replace('/member/dashboard');
+      return;
+    }
+
     loadAdminData();
 
     // 1. Ambil data pengguna terbaru langsung dari Cloud Firestore

@@ -284,7 +284,7 @@ export default function LandingPage() {
 
             {isLoggedIn ? (
               <Link
-                href="/member/dashboard"
+                href="/dashboard"
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#5B5BF7] to-[#06B6D4] text-white text-xs font-bold shadow-[0_0_18px_rgba(91,91,247,0.35)] hover:shadow-[0_0_25px_rgba(6,182,212,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <LayoutDashboard className="w-4 h-4" />

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Link2,
   LayoutTemplate,
@@ -17,7 +18,7 @@ import {
   Sparkles,
   Activity,
 } from 'lucide-react';
-import { getStoredLinks, getStoredMicrosites, getStoredUser } from '@/lib/storage';
+import { getStoredLinks, getStoredMicrosites, getStoredUser, isUserLoggedIn } from '@/lib/storage';
 import { ShortLink, Microsite, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
 import { MOCK_TRAFFIC_DATA, INITIAL_USER } from '@/lib/mockData';
@@ -29,6 +30,7 @@ import { TrafficLineChart } from '@/components/dashboard/TrafficLineChart';
 import { getUserQuotaSummary } from '@/lib/quota';
 
 export default function MemberDashboardPage() {
+  const router = useRouter();
   const { showToast } = useToast();
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [microsites, setMicrosites] = useState<Microsite[]>([]);
@@ -47,10 +49,14 @@ export default function MemberDashboardPage() {
   };
 
   useEffect(() => {
+    if (!isUserLoggedIn()) {
+      router.replace('/login');
+      return;
+    }
     loadData();
     window.addEventListener('mfy_storage_update', loadData);
     return () => window.removeEventListener('mfy_storage_update', loadData);
-  }, []);
+  }, [router]);
 
   const totalClicks = links.reduce((sum, l) => sum + l.metrics.totalClicks, 0);
   const totalViews = microsites.reduce((sum, m) => sum + m.views, 0);

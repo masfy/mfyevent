@@ -30,6 +30,8 @@ import { CreateLinkModal } from '@/components/dashboard/CreateLinkModal';
 import { CreateMicrositeModal } from '@/components/dashboard/CreateMicrositeModal';
 import { INITIAL_USER } from '@/lib/mockData';
 import { getStoredUser, setAuthSession } from '@/lib/storage';
+import { getFirebaseAuth } from '@/lib/firebase/config';
+import { signOut } from 'firebase/auth';
 import { User } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -98,7 +100,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     { id: 'nav-settings', label: 'Settings', href: '/settings', icon: Settings },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const auth = getFirebaseAuth();
+    if (auth) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn('SignOut error:', err);
+      }
+    }
     setAuthSession(false);
     window.location.href = '/';
   };

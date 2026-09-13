@@ -4,6 +4,7 @@ import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ClientSecurityGuard } from '@/components/security/ClientSecurityGuard';
+import { AutoLogoutGuard } from '@/components/security/AutoLogoutGuard';
 import { FirebaseObserver } from '@/components/FirebaseObserver';
 
 const geistSans = Geist({
@@ -91,6 +92,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider>
             <ClientSecurityGuard />
+            <AutoLogoutGuard />
             <FirebaseObserver />
             {children}
           </ToastProvider>

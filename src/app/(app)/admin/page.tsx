@@ -2,12 +2,22 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getStoredUser, isUserLoggedIn } from '@/lib/storage';
 
 export default function AdminRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/admin/dashboard');
+    if (!isUserLoggedIn()) {
+      router.replace('/login');
+      return;
+    }
+    const user = getStoredUser();
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      router.replace('/admin/dashboard');
+    } else {
+      router.replace('/member/dashboard');
+    }
   }, [router]);
 
   return (
