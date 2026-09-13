@@ -68,7 +68,7 @@ export default function RootLayout({
     <html
       lang="id"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -76,19 +76,25 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                const saved = localStorage.getItem('mfy_theme');
-                if (saved === 'light') {
-                  document.documentElement.classList.remove('dark');
-                } else {
+              (function() {
+                try {
+                  var saved = localStorage.getItem('mfy_theme');
+                  if (saved === 'light') {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.style.colorScheme = 'light';
+                  } else {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.style.colorScheme = 'dark';
+                  }
+                } catch (e) {
                   document.documentElement.classList.add('dark');
                 }
-              } catch (e) {}
+              })();
             `,
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-[#F8FAFC] dark:bg-[#070913] text-slate-900 dark:text-slate-100 selection:bg-[#5B5BF7]/20 selection:text-[#5B5BF7] transition-colors duration-200">
+      <body className="min-h-full flex flex-col bg-[#F8FAFC] dark:bg-[#070913] text-slate-900 dark:text-slate-100 selection:bg-[#5B5BF7]/20 selection:text-[#5B5BF7]">
         <ThemeProvider>
           <ToastProvider>
             <ClientSecurityGuard />

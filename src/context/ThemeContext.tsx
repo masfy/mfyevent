@@ -13,21 +13,27 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const getStoredTheme = (): Theme => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('mfy_theme');
+      if (saved === 'light' || saved === 'dark') {
+        return saved;
+      }
+    } catch {}
+  }
+  return 'dark';
+};
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>(getStoredTheme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem('mfy_theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') {
-      setThemeState(saved);
-      document.documentElement.classList.toggle('dark', saved === 'dark');
-    } else {
-      // Default to dark mode for MfyEvent signature look
-      setThemeState('dark');
-      document.documentElement.classList.add('dark');
-    }
+    const active = getStoredTheme();
+    setThemeState(active);
+    document.documentElement.classList.toggle('dark', active === 'dark');
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'mfy_theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
