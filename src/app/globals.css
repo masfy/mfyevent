@@ -1,0 +1,312 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --brand-primary: #5B5BF7;
+    --brand-primary-hover: #4848E8;
+    --brand-secondary: #06B6D4;
+    --brand-gradient: linear-gradient(135deg, #5B5BF7 0%, #06B6D4 100%);
+    --brand-gradient-hover: linear-gradient(135deg, #4848E8 0%, #0891B2 100%);
+
+    --canvas: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface-elevated: #FFFFFF;
+    --border: #E2E8F0;
+    --border-subtle: #F1F5F9;
+
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+
+    --success: #10B981;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --canvas: #070913;
+    --surface: #0F172A;
+    --surface-elevated: #1E293B;
+    --border: #1E293B;
+    --border-subtle: #334155;
+
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--text-primary);
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 380ms cubic-bezier(0.16, 1, 0.3, 1), color 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* ================= HARDWARE-ACCELERATED SMOOTH THEME TRANSITION ================= */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Silky-Smooth Universal Theme Crossfade during toggle */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
+  transition-duration: 380ms !important;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+  html.theme-transitioning,
+  html.theme-transitioning * {
+    transition: none !important;
+  }
+}
+
+/* Smart Dark Mode Surface Styling for Member & Admin Views */
+.dark .app-card-dark,
+.dark .bg-white:not([data-theme-keep="white"]):not(.keep-white) {
+  background-color: #0F172A;
+  color: #F8FAFC;
+}
+
+.dark .hover\:bg-slate-50:hover {
+  background-color: #1E293B !important;
+}
+
+.dark .hover\:bg-slate-100:hover {
+  background-color: #1E293B !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #090D16;
+}
+
+.dark .border-slate-200 {
+  border-color: #1E293B;
+}
+
+.dark .border-slate-100 {
+  border-color: #1E293B;
+}
+
+.dark .text-slate-900 {
+  color: #F8FAFC;
+}
+
+.dark .text-slate-800 {
+  color: #F1F5F9;
+}
+
+.dark .text-slate-700 {
+  color: #E2E8F0;
+}
+
+.dark .text-slate-600 {
+  color: #94A3B8;
+}
+
+.dark .text-slate-500 {
+  color: #64748B;
+}
+
+
+/* Glassmorphism & Modern SaaS Accents */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+/* Subtle Shimmer for Skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* Smooth micro-interaction transitions */
+.transition-smooth {
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Modern Tech Grid Pattern & Section Blending Utilities */
+.bg-grid-tech {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+}
+
+.bg-grid-hero-purple-blue {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(91, 91, 247, 0.28) 1.5px, transparent 1.5px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.28) 1.5px, transparent 1.5px);
+}
+
+.bg-grid-tech-light {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(148, 163, 184, 0.40) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.40) 1px, transparent 1px);
+}
+
+.bg-grid-hero-purple-blue-light {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(91, 91, 247, 0.65) 1.5px, transparent 1.5px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.65) 1.5px, transparent 1.5px);
+}
+
+.bg-grid-indigo {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(139, 92, 246, 0.16) 1px, transparent 1px);
+}
+
+.bg-grid-cyan {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(6, 182, 212, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.16) 1px, transparent 1px);
+}
+
+.bg-grid-magenta {
+  background-size: 56px 56px;
+  background-image: 
+    linear-gradient(to right, rgba(168, 85, 247, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 158, 11, 0.16) 1px, transparent 1px);
+}
+
+.mask-radial-faded {
+  mask-image: radial-gradient(ellipse 95% 85% at 50% 45%, #000 50%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 95% 85% at 50% 45%, #000 50%, transparent 95%);
+}
+
+.mask-hero-fade {
+  mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+}
+
+/* Transparan di bagian tepi atas, kanan, dan kiri */
+.mask-hero-edges {
+  mask-image: radial-gradient(ellipse 92% 82% at 50% 45%, #000 48%, rgba(0, 0, 0, 0.55) 75%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 92% 82% at 50% 45%, #000 48%, rgba(0, 0, 0, 0.55) 75%, transparent 100%);
+}
+
+/* Glassmorphism for Dark SaaS Elements */
+.glass-dark {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-dark-card {
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Smooth Spinning Animation for Story Ring / Avatar Gradient Line */
+@keyframes spin-gradient {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-gradient 4s linear infinite;
+}
+
+/* Floating Animations for Hero Section Cards */
+@keyframes float-card-1 {
+  0%, 100% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(-1.5deg);
+  }
+}
+
+@keyframes float-card-2 {
+  0%, 100% {
+    transform: translateY(0px) rotate(2deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(3.5deg);
+  }
+}
+
+@keyframes float-card-3 {
+  0%, 100% {
+    transform: translateY(0px) rotate(3deg);
+  }
+  50% {
+    transform: translateY(-11px) rotate(1deg);
+  }
+}
+
+.animate-float-1 {
+  animation: float-card-1 6s ease-in-out infinite;
+}
+
+.animate-float-2 {
+  animation: float-card-2 8s ease-in-out infinite 0.5s;
+}
+
+.animate-float-3 {
+  animation: float-card-3 7s ease-in-out infinite 1s;
+}
+
+
+
