@@ -86,9 +86,9 @@ export const signInWithGoogle = async (fallbackEmail?: string, fallbackName?: st
   }
 
   // 2. Mode Simulasi Cepat (Jika kredensial Firebase di .env / Settings belum diisi)
-  // Memungkinkan pengujian instan untuk admin alfyarnaim@gmail.com maupun pendaftar baru
-  const email = (fallbackEmail || PRIMARY_ADMIN_EMAIL).trim().toLowerCase();
-  const displayName = fallbackName || (email === PRIMARY_ADMIN_EMAIL ? 'Alfy Arnaim' : email.split('@')[0]);
+  // Default ke akun Member Komunitas demi keamanan (bukan admin)
+  const email = (fallbackEmail || 'member.demo@mfyevent.my.id').trim().toLowerCase();
+  const displayName = fallbackName || (email === PRIMARY_ADMIN_EMAIL ? 'Alfy Arnaim' : 'Member Komunitas');
 
   const appUser = handleGoogleAuthSuccess({
     uid: `google_sim_${Date.now()}`,

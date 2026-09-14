@@ -13,7 +13,12 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { MOCK_DEVICES, MOCK_REFERRERS } from '@/lib/mockData';
-import { getStoredLinks, getStoredMicrosites, getStoredUser } from '@/lib/storage';
+import {
+  getUserStoredLinks,
+  getUserStoredMicrosites,
+  getStoredUser,
+} from '@/lib/storage';
+import { isUserAdmin } from '@/lib/quota';
 import { formatNumber } from '@/lib/utils';
 import { ShortLink, Microsite, User } from '@/types';
 import { TrafficTrendChart } from '@/components/dashboard/TrafficTrendChart';
@@ -24,23 +29,22 @@ export default function AnalyticsPage() {
   const [microsites, setMicrosites] = useState<Microsite[]>([]);
   const [user, setUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    setLinks(getStoredLinks());
-    setMicrosites(getStoredMicrosites());
-    setUser(getStoredUser());
+  const loadData = () => {
+    const currentUser = getStoredUser();
+    setUser(currentUser);
+    setLinks(getUserStoredLinks(currentUser));
+    setMicrosites(getUserStoredMicrosites(currentUser));
+  };
 
-    const handleStorageUpdate = () => {
-      setLinks(getStoredLinks());
-      setMicrosites(getStoredMicrosites());
-      setUser(getStoredUser());
-    };
-    window.addEventListener('mfy_storage_update', handleStorageUpdate);
-    return () => window.removeEventListener('mfy_storage_update', handleStorageUpdate);
+  useEffect(() => {
+    loadData();
+    window.addEventListener('mfy_storage_update', loadData);
+    return () => window.removeEventListener('mfy_storage_update', loadData);
   }, []);
 
   const totalClicks = links.reduce((sum, l) => sum + l.metrics.totalClicks, 0);
   const totalViews = microsites.reduce((sum, m) => sum + m.views, 0);
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isAdmin = isUserAdmin(user);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">

@@ -22,10 +22,13 @@ export const QUOTA_LIMITS = {
  */
 export const isUserAdmin = (user?: User | null): boolean => {
   if (!user) return false;
+  // Jika role pengguna adalah 'USER', maka mutlak merupakan Member (bukan Admin)
+  if (user.role === 'USER') {
+    return false;
+  }
   return (
     user.role === 'ADMIN' ||
-    user.role === 'SUPER_ADMIN' ||
-    user.email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL.trim().toLowerCase()
+    user.role === 'SUPER_ADMIN'
   );
 };
 

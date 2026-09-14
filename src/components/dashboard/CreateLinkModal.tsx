@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { cleanShortSlug, generateRandomSlug, isSlugReserved } from '@/lib/utils';
-import { getStoredLinks, saveStoredLinks, getStoredUser } from '@/lib/storage';
+import { getStoredLinks, saveStoredLinks, getStoredUser, getUserStoredLinks } from '@/lib/storage';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { ShortLink } from '@/types';
 import { useToast } from '@/components/ui/Toast';
@@ -25,7 +25,8 @@ export const CreateLinkModal: React.FC<CreateLinkModalProps> = ({
   const { showToast } = useToast();
   const currentUser = getStoredUser();
   const currentLinks = getStoredLinks();
-  const quota = getUserQuotaSummary(currentUser, currentLinks.length, 0);
+  const userLinks = getUserStoredLinks(currentUser);
+  const quota = getUserQuotaSummary(currentUser, userLinks.length, 0);
 
   const [destinationUrl, setDestinationUrl] = useState('');
   const [slug, setSlug] = useState('');
@@ -142,7 +143,7 @@ export const CreateLinkModal: React.FC<CreateLinkModalProps> = ({
     const newLink: ShortLink = {
       id: `link_${Date.now()}`,
       slug: cleanSlug,
-      ownerId: currentUser.uid || 'usr_masalfy_01',
+      ownerId: currentUser.uid || 'usr_guest',
       title: title.trim() || cleanSlug,
       destinationUrl: targetUrl,
       status: 'ACTIVE',

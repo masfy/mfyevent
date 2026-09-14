@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { normalizeSlug, isSlugReserved } from '@/lib/utils';
-import { getStoredMicrosites, saveStoredMicrosites, getStoredUser } from '@/lib/storage';
+import { getStoredMicrosites, saveStoredMicrosites, getStoredUser, getUserStoredMicrosites } from '@/lib/storage';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { Microsite } from '@/types';
 import { PREBUILT_THEMES } from '@/lib/mockData';
@@ -25,8 +25,8 @@ export const CreateMicrositeModal: React.FC<CreateMicrositeModalProps> = ({
   const router = useRouter();
   const { showToast } = useToast();
   const currentUser = getStoredUser();
-  const existingMicrosites = getStoredMicrosites();
-  const quota = getUserQuotaSummary(currentUser, 0, existingMicrosites.length);
+  const userMicrosites = getUserStoredMicrosites(currentUser);
+  const quota = getUserQuotaSummary(currentUser, 0, userMicrosites.length);
 
   const [slug, setSlug] = useState('');
   const [title, setTitle] = useState('');
@@ -76,7 +76,7 @@ export const CreateMicrositeModal: React.FC<CreateMicrositeModalProps> = ({
 
     const newSite: Microsite = {
       id: `ms_${cleanSlug}_${Date.now()}`,
-      ownerId: currentUser.uid || 'usr_masalfy_01',
+      ownerId: currentUser.uid || 'usr_guest',
       slug: cleanSlug,
       title: title.trim() || `@${cleanSlug}`,
       status: 'PUBLISHED',

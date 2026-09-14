@@ -3,7 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Link2, LayoutTemplate, ArrowRight, Sparkles } from 'lucide-react';
-import { getStoredLinks, getStoredMicrosites, getStoredUser } from '@/lib/storage';
+import {
+  getStoredUser,
+  getUserStoredLinks,
+  getUserStoredMicrosites,
+} from '@/lib/storage';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { useToast } from '@/components/ui/Toast';
 
@@ -23,15 +27,17 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const { showToast } = useToast();
   const [linksCount, setLinksCount] = useState(0);
   const [micrositesCount, setMicrositesCount] = useState(0);
+  const [user, setUser] = useState(getStoredUser());
 
   useEffect(() => {
     if (isOpen) {
-      setLinksCount(getStoredLinks().length);
-      setMicrositesCount(getStoredMicrosites().length);
+      const u = getStoredUser();
+      setUser(u);
+      setLinksCount(getUserStoredLinks(u).length);
+      setMicrositesCount(getUserStoredMicrosites(u).length);
     }
   }, [isOpen]);
 
-  const user = getStoredUser();
   const quota = getUserQuotaSummary(user, linksCount, micrositesCount);
 
   const handleChooseShortLink = () => {

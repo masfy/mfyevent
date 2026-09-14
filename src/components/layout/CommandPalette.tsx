@@ -13,8 +13,13 @@ import {
   ExternalLink,
   X,
 } from 'lucide-react';
-import { getStoredLinks, getStoredMicrosites } from '@/lib/storage';
-import { ShortLink, Microsite } from '@/types';
+import {
+  getStoredUser,
+  getUserStoredLinks,
+  getUserStoredMicrosites,
+} from '@/lib/storage';
+import { isUserAdmin } from '@/lib/quota';
+import { ShortLink, Microsite, User } from '@/types';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -31,13 +36,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 }) => {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [user, setUser] = useState<User | null>(null);
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [microsites, setMicrosites] = useState<Microsite[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      setLinks(getStoredLinks());
-      setMicrosites(getStoredMicrosites());
+      const currentUser = getStoredUser();
+      setUser(currentUser);
+      setLinks(getUserStoredLinks(currentUser));
+      setMicrosites(getUserStoredMicrosites(currentUser));
       setQuery('');
     }
   }, [isOpen]);
@@ -163,13 +171,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   <LayoutTemplate className="w-4 h-4 text-slate-500" />
                   <span>Daftar Microsite</span>
                 </button>
-                <button
-                  onClick={() => handleNavigate('/admin')}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-colors text-left"
-                >
-                  <ShieldCheck className="w-4 h-4 text-[#5B5BF7]" />
-                  <span>Portal Admin & Moderasi</span>
-                </button>
+                {isUserAdmin(user) && (
+                  <button
+                    onClick={() => handleNavigate('/admin/dashboard')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-colors text-left"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-[#5B5BF7]" />
+                    <span>Portal Admin & Moderasi</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

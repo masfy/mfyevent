@@ -115,6 +115,92 @@ export const saveStoredMicrosites = (microsites: Microsite[]) => {
   window.dispatchEvent(new Event('mfy_storage_update'));
 };
 
+/**
+ * Memeriksa apakah user memiliki hak akses Admin
+ */
+export const checkIsAdmin = (user?: User | null): boolean => {
+  if (!user) return false;
+  if (user.role === 'USER') return false;
+  return user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+};
+
+/**
+ * Mengambil tautan milik pengguna saat ini (atau semua jika Admin)
+ */
+export const getUserStoredLinks = (currentUser?: User | null): ShortLink[] => {
+  const all = getStoredLinks();
+  if (!currentUser) return [];
+  if (checkIsAdmin(currentUser)) return all;
+  return all.filter((l) => l.ownerId === currentUser.uid);
+};
+
+/**
+ * Mengambil microsite milik pengguna saat ini (atau semua jika Admin)
+ */
+export const getUserStoredMicrosites = (currentUser?: User | null): Microsite[] => {
+  const all = getStoredMicrosites();
+  if (!currentUser) return [];
+  if (checkIsAdmin(currentUser)) return all;
+  return all.filter((m) => m.ownerId === currentUser.uid);
+};
+
+/**
+ * Hapus link secara aman dengan verifikasi hak kepemilikan (Tenant Isolation)
+ */
+export const deleteUserStoredLink = (linkId: string, currentUser?: User | null): boolean => {
+  if (typeof window === 'undefined') return false;
+  const all = getStoredLinks();
+  const target = all.find((l) => l.id === linkId);
+  if (!target) return false;
+  if (!checkIsAdmin(currentUser) && target.ownerId !== currentUser?.uid) {
+    console.warn('Unauthorized delete link attempt:', linkId);
+    return false;
+  }
+  const updated = all.filter((l) => l.id !== linkId);
+  saveStoredLinks(updated);
+  return true;
+};
+
+/**
+ * Update status link secara aman dengan verifikasi hak kepemilikan (Tenant Isolation)
+ */
+export const toggleUserStoredLinkStatus = (linkId: string, currentUser?: User | null): boolean => {
+  if (typeof window === 'undefined') return false;
+  const all = getStoredLinks();
+  const target = all.find((l) => l.id === linkId);
+  if (!target) return false;
+  if (!checkIsAdmin(currentUser) && target.ownerId !== currentUser?.uid) {
+    console.warn('Unauthorized toggle link status attempt:', linkId);
+    return false;
+  }
+  const updated = all.map((l) => {
+    if (l.id === linkId) {
+      const nextStatus = l.status === 'ACTIVE' ? ('DISABLED' as const) : ('ACTIVE' as const);
+      return { ...l, status: nextStatus, updatedAt: new Date().toISOString() };
+    }
+    return l;
+  });
+  saveStoredLinks(updated);
+  return true;
+};
+
+/**
+ * Hapus microsite secara aman dengan verifikasi hak kepemilikan (Tenant Isolation)
+ */
+export const deleteUserStoredMicrosite = (micrositeId: string, currentUser?: User | null): boolean => {
+  if (typeof window === 'undefined') return false;
+  const all = getStoredMicrosites();
+  const target = all.find((m) => m.id === micrositeId);
+  if (!target) return false;
+  if (!checkIsAdmin(currentUser) && target.ownerId !== currentUser?.uid) {
+    console.warn('Unauthorized delete microsite attempt:', micrositeId);
+    return false;
+  }
+  const updated = all.filter((m) => m.id !== micrositeId);
+  saveStoredMicrosites(updated);
+  return true;
+};
+
 export const getStoredUsers = (): User[] => {
   if (typeof window === 'undefined') return INITIAL_USERS_LIST;
   checkAndCleanLegacyMockData();
@@ -184,12 +270,18 @@ export const getStoredUser = (): User => {
 
 export const saveStoredUser = (user: User) => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  // Security protection: only primary admin email can hold SUPER_ADMIN
+  const isPrimaryAdmin = user.email?.trim().toLowerCase() === 'alfyarnaim@gmail.com';
+  const safeUser: User = {
+    ...user,
+    role: isPrimaryAdmin ? user.role : (user.role === 'SUPER_ADMIN' ? 'USER' : user.role),
+  };
+  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(safeUser));
   // Keep users list in sync
   const users = getStoredUsers();
-  const idx = users.findIndex((u) => u.uid === user.uid);
+  const idx = users.findIndex((u) => u.uid === safeUser.uid);
   if (idx >= 0) {
-    users[idx] = user;
+    users[idx] = safeUser;
     saveStoredUsers(users);
   }
   window.dispatchEvent(new Event('mfy_storage_update'));
@@ -337,26 +429,8 @@ export const handleGoogleAuthSuccess = (googleUser: {
   return targetUser;
 };
 
-export const toggleUserRole = (targetRole?: 'USER' | 'SUPER_ADMIN'): User => {
-  const current = getStoredUser();
-  const nextRole = targetRole || (current.role === 'SUPER_ADMIN' ? 'USER' : 'SUPER_ADMIN');
-  const users = getStoredUsers();
-  // Find matching user from list or fallback
-  const matchingUser = users.find((u) => u.role === nextRole);
-  if (matchingUser) {
-    saveStoredUser(matchingUser);
-    return matchingUser;
-  }
-  const updated: User = {
-    ...current,
-    role: nextRole,
-    displayName: nextRole === 'USER' ? 'Ahmad Fauzi (Member)' : 'Mas Alfy (Admin)',
-    username: nextRole === 'USER' ? 'ahmadfauzi' : 'masalfy',
-    shortLinksCount: nextRole === 'USER' ? 4 : 12,
-    micrositesCount: nextRole === 'USER' ? 1 : 3,
-  };
-  saveStoredUser(updated);
-  return updated;
+export const toggleUserRole = (_targetRole?: 'USER' | 'SUPER_ADMIN'): User => {
+  return getStoredUser();
 };
 
 

@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '@/types';
-import { getStoredUser, saveStoredUser } from '@/lib/storage';
-import { INITIAL_USER } from '@/lib/mockData';
+import { getStoredUser, saveStoredUser, GUEST_USER } from '@/lib/storage';
 import { useToast } from '@/components/ui/Toast';
 import {
   User as UserIcon,
@@ -30,15 +29,17 @@ import {
   PRIMARY_ADMIN_EMAIL,
   FirebaseConfig,
 } from '@/lib/firebase/config';
+import { isUserAdmin } from '@/lib/quota';
 
 export default function SettingsPage() {
   const { showToast } = useToast();
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'firebase'>('profile');
-  const [user, setUser] = useState<User>(INITIAL_USER);
+  const [user, setUser] = useState<User>(GUEST_USER);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
 
-  // Firebase Config State
+  // Firebase Config State (Hanya diisi dan diakses untuk Admin)
   const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>({
     apiKey: '',
     authDomain: '',
@@ -50,26 +51,49 @@ export default function SettingsPage() {
   const [isConfigured, setIsConfigured] = useState(false);
   const [testingFirebase, setTestingFirebase] = useState(false);
 
-  const syncUserData = () => {
-    const u = getStoredUser();
-    setUser(u);
-    setDisplayName(u.displayName);
-    setUsername(u.username);
-  };
-
   const loadFirebaseSettings = () => {
     const cfg = getFirebaseConfig();
     setFirebaseConfig(cfg);
     setIsConfigured(isFirebaseConfigured());
   };
 
-  useEffect(() => {
-    syncUserData();
-    loadFirebaseSettings();
-    window.addEventListener('mfy_storage_update', () => {
-      syncUserData();
+  const syncUserData = () => {
+    const u = getStoredUser();
+    setUser(u);
+    setDisplayName(u.displayName);
+    setUsername(u.username);
+    if (u.role !== 'USER' && isUserAdmin(u)) {
       loadFirebaseSettings();
-    });
+    } else {
+      setActiveTab('profile');
+    }
+  };
+
+  useEffect(() => {
+    const u = getStoredUser();
+    setUser(u);
+    setDisplayName(u.displayName);
+    setUsername(u.username);
+    const admin = u.role !== 'USER' && isUserAdmin(u);
+    if (admin) {
+      loadFirebaseSettings();
+      // Periksa apakah admin membuka langsung link ?tab=firebase
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'firebase') {
+          setActiveTab('firebase');
+        }
+      }
+    } else {
+      setActiveTab('profile');
+    }
+    setMounted(true);
+
+    const handleStorageUpdate = () => {
+      syncUserData();
+    };
+    window.addEventListener('mfy_storage_update', handleStorageUpdate);
+    return () => window.removeEventListener('mfy_storage_update', handleStorageUpdate);
   }, []);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,12 +137,17 @@ export default function SettingsPage() {
 
   const handleSaveFirebase = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      showToast('Akses ditolak: Hanya Administrator yang berhak mengubah konfigurasi Firebase.', 'error');
+      return;
+    }
     saveFirebaseConfig(firebaseConfig);
     setIsConfigured(isFirebaseConfigured());
     showToast('Konfigurasi Firebase berhasil disimpan! 🎉', 'success');
   };
 
   const handleTestFirebase = () => {
+    if (!isAdmin) return;
     setTestingFirebase(true);
     setTimeout(() => {
       setTestingFirebase(false);
@@ -131,6 +160,7 @@ export default function SettingsPage() {
   };
 
   const handleClearAllMockData = () => {
+    if (!isAdmin) return;
     if (
       confirm(
         'Apakah Anda yakin ingin menghapus seluruh data uji coba? Seluruh tautan sementara, microsite, dan riwayat di browser ini akan dibersihkan.'
@@ -157,53 +187,77 @@ export default function SettingsPage() {
     }
   };
 
-  const isMember = user.role === 'USER';
-  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+  const isAdmin = user.role !== 'USER' && isUserAdmin(user);
+  const isMember = !isAdmin;
+
+  // Keamanan Ketat: Jika akun Member mencoba mengakses tab firebase, otomatis alihkan ke tab profil
+  useEffect(() => {
+    if (mounted && (!isAdmin || user.role === 'USER') && activeTab === 'firebase') {
+      setActiveTab('profile');
+    }
+  }, [mounted, isAdmin, user.role, activeTab]);
+
+  if (!mounted) {
+    return (
+      <div className="max-w-4xl space-y-6 animate-pulse" aria-busy="true">
+        <div className="space-y-2">
+          <div className="h-7 w-64 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+          <div className="h-4 w-96 max-w-full bg-slate-100 dark:bg-slate-800/60 rounded-lg" />
+        </div>
+        <div className="h-24 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5" />
+        <div className="h-96 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl space-y-6 animate-in fade-in duration-200">
+    <div suppressHydrationWarning className="max-w-4xl space-y-6 animate-in fade-in duration-200">
       <div>
         <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Pengaturan Sistem & Profil
+          {isAdmin ? 'Pengaturan Sistem & Profil' : 'Pengaturan Profil Akun'}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Kelola informasi identitas akun, integrasi Firebase, dan preferensi layanan MfyEvent Anda.
+          {isAdmin
+            ? 'Kelola informasi identitas akun, integrasi Firebase, dan preferensi layanan MfyEvent Anda.'
+            : 'Kelola informasi identitas profil dan preferensi akun MfyEvent Anda.'}
         </p>
       </div>
 
-      {/* ================= SETTINGS NAVIGATION TABS ================= */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'profile'
-              ? 'bg-white dark:bg-slate-800 text-[#5B5BF7] dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
-          }`}
-        >
-          <UserIcon className="w-3.5 h-3.5" />
-          <span>Profil Akun</span>
-        </button>
+      {/* ================= SETTINGS NAVIGATION TABS (HANYA MUNCUL JIKA ADMIN) ================= */}
+      {isAdmin && (
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'profile'
+                ? 'bg-white dark:bg-slate-800 text-[#5B5BF7] dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <UserIcon className="w-3.5 h-3.5" />
+            <span>Profil Akun</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('firebase')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'firebase'
-              ? 'bg-white dark:bg-slate-800 text-[#5B5BF7] dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
-          }`}
-        >
-          <Flame className="w-3.5 h-3.5 text-amber-500" />
-          <span>Integrasi Firebase</span>
-          {isConfigured ? (
-            <span className="w-2 h-2 rounded-full bg-emerald-500" title="Firebase Terkonfigurasi" />
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-amber-400" title="Mode Simulasi" />
-          )}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('firebase')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'firebase'
+                ? 'bg-white dark:bg-slate-800 text-[#5B5BF7] dark:text-indigo-400 shadow-xs border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-500" />
+            <span>Integrasi Firebase</span>
+            {isConfigured ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-500" title="Firebase Terkonfigurasi" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-amber-400" title="Mode Simulasi" />
+            )}
+          </button>
+        </div>
+      )}
 
       {/* ================= TAB 1: PROFILE TAB ================= */}
       {activeTab === 'profile' && (
@@ -344,32 +398,34 @@ export default function SettingsPage() {
             </div>
           </form>
 
-          {/* Kartu Manajemen Data & Pembersihan Mockup */}
-          <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] shadow-xs">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Trash2 className="w-4 h-4 text-rose-500" />
-                  <span>Pembersihan Data Uji Coba & Penyimpanan</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Hapus seluruh sisa data contoh (short link, microsite, dan riwayat sementara) di browser ini agar sistem dimulai dari database yang 100% bersih.
-                </p>
+          {/* Kartu Manajemen Data & Pembersihan Mockup (Hanya untuk Admin) */}
+          {isAdmin && (
+            <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] shadow-xs">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-rose-500" />
+                    <span>Pembersihan Data Uji Coba & Penyimpanan</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Hapus seluruh sisa data contoh (short link, microsite, dan riwayat sementara) di browser ini agar sistem dimulai dari database yang 100% bersih.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearAllMockData}
+                  className="px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors shrink-0 cursor-pointer"
+                >
+                  Bersihkan Data Sementara
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleClearAllMockData}
-                className="px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors shrink-0 cursor-pointer"
-              >
-                Bersihkan Data Sementara
-              </button>
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* ================= TAB 2: FIREBASE INTEGRATION TAB ================= */}
-      {activeTab === 'firebase' && (
+      {/* ================= TAB 2: FIREBASE INTEGRATION TAB (ADMIN ONLY) ================= */}
+      {activeTab === 'firebase' && isAdmin && user.role !== 'USER' && (
         <div className="space-y-6">
           {/* Header Status Banner */}
           <div className="p-6 rounded-3xl border bg-gradient-to-r from-amber-500/10 via-slate-50 to-cyan-500/10 dark:from-amber-950/20 dark:via-slate-900 dark:to-cyan-950/20 border-amber-500/20 dark:border-amber-500/30">

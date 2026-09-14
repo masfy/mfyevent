@@ -13,7 +13,11 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { getStoredMicrosites, saveStoredMicrosites, getStoredUser } from '@/lib/storage';
+import {
+  getUserStoredMicrosites,
+  deleteUserStoredMicrosite,
+  getStoredUser,
+} from '@/lib/storage';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { Microsite, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
@@ -28,8 +32,9 @@ export default function MicrositesListPage() {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
   const loadData = () => {
-    setMicrosites(getStoredMicrosites());
-    setUser(getStoredUser());
+    const currentUser = getStoredUser();
+    setUser(currentUser);
+    setMicrosites(getUserStoredMicrosites(currentUser));
   };
 
   useEffect(() => {
@@ -57,9 +62,10 @@ export default function MicrositesListPage() {
 
   const handleDelete = (id: string, title: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus microsite "${title}"?`)) {
-      const updated = microsites.filter((m) => m.id !== id);
-      saveStoredMicrosites(updated);
-      showToast('Microsite berhasil dihapus');
+      const success = deleteUserStoredMicrosite(id, user);
+      if (success) {
+        showToast('Microsite berhasil dihapus');
+      }
     }
   };
 

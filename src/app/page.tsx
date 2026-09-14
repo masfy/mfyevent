@@ -188,7 +188,7 @@ export default function LandingPage() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-300 overflow-x-hidden ${
+      className={`min-h-screen flex flex-col transition-colors duration-300 overflow-x-clip ${
         isDark
           ? 'bg-[#070913] text-white selection:bg-[#5B5BF7]/30 selection:text-white'
           : 'bg-[#F8FAFC] text-slate-900 selection:bg-[#5B5BF7]/20 selection:text-[#5B5BF7]'
@@ -197,10 +197,10 @@ export default function LandingPage() {
       {/* ================= FIXED NAVBAR (ALWAYS VISIBLE WHILE SCROLLING) ================= */}
       <header className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6 py-2.5 sm:py-3.5 w-full pointer-events-none transition-all duration-300">
         <div
-          className={`max-w-7xl mx-auto rounded-2xl sm:rounded-3xl px-4 sm:px-8 py-3 flex items-center justify-between pointer-events-auto transition-all duration-300 ${
+          className={`max-w-7xl mx-auto rounded-2xl sm:rounded-3xl px-4 sm:px-8 py-3 flex items-center justify-between pointer-events-auto ios-gpu-layer transition-all duration-300 ${
             isDark
-              ? 'bg-[#0A0D1A]/90 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/70 ring-1 ring-white/5'
-              : 'bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-xl shadow-slate-900/10 ring-1 ring-black/5'
+              ? 'bg-[#0A0D1A]/90 backdrop-blur-md sm:backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/70 ring-1 ring-white/5'
+              : 'bg-white/95 backdrop-blur-md sm:backdrop-blur-xl border border-slate-200/90 shadow-xl shadow-slate-900/10 ring-1 ring-black/5'
           }`}
         >
           <BrandLogo size="md" theme={theme} href="/" />
@@ -326,22 +326,20 @@ export default function LandingPage() {
           }`}
         />
 
-        {/* Layer 3: Ambient Radial Glows in Purple & Blue */}
+        {/* Layer 3: Ambient Radial Glows in Purple & Blue (GPU-Friendly Radial Gradients) */}
         <div
-          className={`absolute -top-10 left-1/2 -translate-x-[75%] sm:-translate-x-[60%] w-[380px] sm:w-[650px] h-[380px] sm:h-[650px] rounded-full blur-[130px] pointer-events-none ${
-            isDark ? 'bg-[#5B5BF7]/30' : 'bg-[#5B5BF7]/14'
+          className={`absolute -top-10 left-1/2 -translate-x-[75%] sm:-translate-x-[60%] w-[380px] sm:w-[650px] h-[380px] sm:h-[650px] rounded-full glow-orb-purple pointer-events-none ${
+            isDark ? 'opacity-90' : 'opacity-40'
           }`}
         />
         <div
-          className={`absolute top-10 left-1/2 translate-x-[5%] sm:translate-x-[15%] w-[380px] sm:w-[620px] h-[380px] sm:h-[620px] rounded-full blur-[130px] pointer-events-none ${
-            isDark ? 'bg-[#06B6D4]/26' : 'bg-[#06B6D4]/14'
+          className={`absolute top-10 left-1/2 translate-x-[5%] sm:translate-x-[15%] w-[380px] sm:w-[620px] h-[380px] sm:h-[620px] rounded-full glow-orb-cyan pointer-events-none ${
+            isDark ? 'opacity-90' : 'opacity-40'
           }`}
         />
         <div
-          className={`absolute top-32 left-1/2 -translate-x-1/2 w-[340px] sm:w-[700px] h-[320px] rounded-full blur-[110px] pointer-events-none ${
-            isDark
-              ? 'bg-gradient-to-r from-[#5B5BF7]/32 to-[#06B6D4]/32'
-              : 'bg-gradient-to-r from-[#5B5BF7]/15 to-[#06B6D4]/15'
+          className={`absolute top-32 left-1/2 -translate-x-1/2 w-[340px] sm:w-[700px] h-[320px] rounded-full glow-orb-purple-cyan pointer-events-none ${
+            isDark ? 'opacity-90' : 'opacity-40'
           }`}
         />
 
@@ -349,10 +347,9 @@ export default function LandingPage() {
         <div
           className={`absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 w-[115%] max-w-4xl h-[620px] sm:h-[720px] rounded-[50%] pointer-events-none z-10 transition-colors duration-300 ${
             isDark
-              ? 'bg-[radial-gradient(ellipse_at_center,rgba(7,9,19,0.80)_0%,rgba(7,9,19,0.52)_45%,rgba(7,9,19,0.22)_72%,transparent_90%)]'
-              : 'bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.85)_0%,rgba(248,250,252,0.55)_45%,rgba(248,250,252,0.22)_72%,transparent_90%)]'
+              ? 'bg-[radial-gradient(ellipse_at_center,rgba(7,9,19,0.92)_0%,rgba(7,9,19,0.65)_40%,rgba(7,9,19,0.25)_70%,transparent_90%)]'
+              : 'bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.92)_0%,rgba(248,250,252,0.65)_40%,rgba(248,250,252,0.25)_70%,transparent_90%)]'
           }`}
-          style={{ filter: 'blur(50px)' }}
         />
 
 
@@ -475,10 +472,10 @@ export default function LandingPage() {
           {/* ================= ULTRA-SOFT RADIAL BACKDROP BEHIND TEXT ================= */}
           {/* Menjadikan kotak-kotak persis di belakang teks lebih soft dan melebur sempurna di mode gelap */}
           <div
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[52%] w-[125%] max-w-4xl h-[500px] rounded-full pointer-events-none -z-10 blur-[54px] transition-colors duration-300 ${
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[52%] w-[125%] max-w-4xl h-[500px] rounded-full pointer-events-none -z-10 transition-colors duration-300 ${
               isDark
-                ? 'bg-[#070913]/70'
-                : 'bg-[#F8FAFC]/75'
+                ? 'bg-[radial-gradient(ellipse_at_center,rgba(7,9,19,0.85)_0%,rgba(7,9,19,0.45)_55%,transparent_85%)]'
+                : 'bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.88)_0%,rgba(248,250,252,0.50)_55%,transparent_85%)]'
             }`}
           />
 
@@ -630,10 +627,10 @@ export default function LandingPage() {
           }`}
         />
 
-        {/* Ambient Indigo Glow */}
+        {/* Ambient Indigo Glow (GPU-Friendly Radial Gradient) */}
         <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[400px] rounded-full blur-[140px] pointer-events-none -z-0 ${
-            isDark ? 'bg-[#6366F1]/14' : 'bg-[#6366F1]/10'
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[400px] rounded-full glow-orb-indigo pointer-events-none -z-0 ${
+            isDark ? 'opacity-85' : 'opacity-40'
           }`}
         />
 
@@ -709,7 +706,7 @@ export default function LandingPage() {
           {/* DEMO 1: SHORT LINK LIVE CARD */}
           {demoTab === 'link' && (
             <div
-              className={`max-w-2xl mx-auto rounded-3xl p-6 sm:p-8 backdrop-blur-xl animate-in fade-in duration-300 ${
+              className={`max-w-2xl mx-auto rounded-3xl p-6 sm:p-8 backdrop-blur-md sm:backdrop-blur-xl ios-gpu-layer animate-in fade-in duration-300 ${
                 isDark
                   ? 'bg-[#0F142A]/90 border border-indigo-500/35 shadow-[0_0_50px_rgba(91,91,247,0.2)]'
                   : 'bg-white border border-slate-200 shadow-xl'
@@ -1190,15 +1187,15 @@ export default function LandingPage() {
           }`}
         />
 
-        {/* Ambient Cyan/Emerald Glows */}
+        {/* Ambient Cyan/Emerald Glows (GPU-Friendly Radial Gradients) */}
         <div
-          className={`absolute top-1/3 left-1/4 w-[600px] h-[380px] rounded-full blur-[140px] pointer-events-none ${
-            isDark ? 'bg-[#06B6D4]/14' : 'bg-[#06B6D4]/10'
+          className={`absolute top-1/3 left-1/4 w-[600px] h-[380px] rounded-full glow-orb-cyan pointer-events-none ${
+            isDark ? 'opacity-85' : 'opacity-40'
           }`}
         />
         <div
-          className={`absolute bottom-1/4 right-1/4 w-[550px] h-[340px] rounded-full blur-[140px] pointer-events-none ${
-            isDark ? 'bg-[#10B981]/12' : 'bg-[#10B981]/8'
+          className={`absolute bottom-1/4 right-1/4 w-[550px] h-[340px] rounded-full glow-orb-emerald pointer-events-none ${
+            isDark ? 'opacity-80' : 'opacity-35'
           }`}
         />
 
@@ -1233,7 +1230,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Card 1: Short Link Cerdas */}
             <div
-              className={`p-7 rounded-3xl transition-all duration-300 flex flex-col justify-between group backdrop-blur-md ${
+              className={`p-7 rounded-3xl transition-all duration-300 flex flex-col justify-between group backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#0A1A2F]/85 border border-indigo-500/25 hover:border-indigo-400 hover:shadow-[0_0_35px_rgba(91,91,247,0.25)]'
                   : 'bg-white border border-slate-200 hover:border-[#5B5BF7] shadow-sm hover:shadow-lg'
@@ -1278,7 +1275,7 @@ export default function LandingPage() {
 
             {/* Card 2: Microsite Builder */}
             <div
-              className={`p-7 rounded-3xl transition-all duration-300 flex flex-col justify-between group backdrop-blur-md ${
+              className={`p-7 rounded-3xl transition-all duration-300 flex flex-col justify-between group backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#0A1A2F]/85 border border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_35px_rgba(6,182,212,0.3)]'
                   : 'bg-white border border-slate-200 hover:border-[#06B6D4] shadow-sm hover:shadow-lg'
@@ -1323,7 +1320,7 @@ export default function LandingPage() {
 
             {/* Card 3: QR Code Studio */}
             <div
-              className={`p-7 rounded-3xl transition-all duration-300 flex flex-col justify-between group backdrop-blur-md ${
+              className={`p-7 rounded-3xl transition-all duration-300 flex flex-col justify-between group backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#0A1A2F]/85 border border-emerald-500/30 hover:border-emerald-400 hover:shadow-[0_0_35px_rgba(16,185,129,0.3)]'
                   : 'bg-white border border-slate-200 hover:border-emerald-500 shadow-sm hover:shadow-lg'
@@ -1391,15 +1388,15 @@ export default function LandingPage() {
           }`}
         />
 
-        {/* Ambient Cosmic Magenta & Warm Amber Glows */}
+        {/* Ambient Cosmic Magenta & Warm Amber Glows (GPU-Friendly Radial Gradients) */}
         <div
-          className={`absolute top-1/4 left-1/4 w-[550px] h-[340px] rounded-full blur-[140px] pointer-events-none ${
-            isDark ? 'bg-[#A855F7]/14' : 'bg-[#A855F7]/10'
+          className={`absolute top-1/4 left-1/4 w-[550px] h-[340px] rounded-full glow-orb-magenta pointer-events-none ${
+            isDark ? 'opacity-85' : 'opacity-40'
           }`}
         />
         <div
-          className={`absolute bottom-1/4 right-1/4 w-[520px] h-[320px] rounded-full blur-[140px] pointer-events-none ${
-            isDark ? 'bg-[#F59E0B]/12' : 'bg-[#F59E0B]/8'
+          className={`absolute bottom-1/4 right-1/4 w-[520px] h-[320px] rounded-full glow-orb-amber pointer-events-none ${
+            isDark ? 'opacity-80' : 'opacity-35'
           }`}
         />
 
@@ -1434,7 +1431,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {/* Audiens 1: Guru */}
             <div
-              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-md ${
+              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#181135]/85 border border-purple-500/25 hover:border-purple-400 hover:shadow-[0_0_25px_rgba(168,85,247,0.25)]'
                   : 'bg-white border border-slate-200 hover:border-purple-400 shadow-xs hover:shadow-md'
@@ -1467,7 +1464,7 @@ export default function LandingPage() {
 
             {/* Audiens 2: Event Organizer */}
             <div
-              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-md ${
+              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#181135]/85 border border-cyan-500/25 hover:border-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.25)]'
                   : 'bg-white border border-slate-200 hover:border-cyan-400 shadow-xs hover:shadow-md'
@@ -1500,7 +1497,7 @@ export default function LandingPage() {
 
             {/* Audiens 3: Komunitas & UMKM */}
             <div
-              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-md ${
+              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#181135]/85 border border-pink-500/25 hover:border-pink-400 hover:shadow-[0_0_25px_rgba(236,72,153,0.25)]'
                   : 'bg-white border border-slate-200 hover:border-pink-400 shadow-xs hover:shadow-md'
@@ -1533,7 +1530,7 @@ export default function LandingPage() {
 
             {/* Audiens 4: Kreator & Freelancer */}
             <div
-              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-md ${
+              className={`p-6 rounded-2xl transition-all duration-300 backdrop-blur-xs sm:backdrop-blur-md ios-gpu-layer ${
                 isDark
                   ? 'bg-[#181135]/85 border border-amber-500/25 hover:border-amber-400 hover:shadow-[0_0_25px_rgba(245,158,11,0.25)]'
                   : 'bg-white border border-slate-200 hover:border-amber-400 shadow-xs hover:shadow-md'
@@ -1617,7 +1614,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={faq.id}
-                  className={`rounded-2xl transition-all duration-300 border overflow-hidden ${
+                  className={`rounded-2xl transition-all duration-300 border overflow-hidden ios-gpu-layer ${
                     isOpen
                       ? isDark
                         ? 'bg-[#0E1326] border-[#5B5BF7]/60 shadow-[0_4px_30px_rgba(91,91,247,0.15)]'
@@ -1700,9 +1697,13 @@ export default function LandingPage() {
           isDark ? 'bg-[#070914]' : 'bg-white'
         }`}
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-r from-[#5B5BF7]/25 to-[#06B6D4]/25 rounded-full blur-[120px] pointer-events-none" />
+        <div
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] glow-orb-purple-cyan rounded-full pointer-events-none ${
+            isDark ? 'opacity-85' : 'opacity-40'
+          }`}
+        />
 
-        <div className="max-w-4xl mx-auto bg-gradient-to-r from-[#5B5BF7] via-[#4F46E5] to-[#06B6D4] rounded-3xl p-8 sm:p-14 text-white text-center shadow-[0_0_60px_rgba(91,91,247,0.35)] relative overflow-hidden border border-white/20">
+        <div className="max-w-4xl mx-auto bg-gradient-to-r from-[#5B5BF7] via-[#4F46E5] to-[#06B6D4] rounded-3xl p-8 sm:p-14 text-white text-center shadow-[0_0_60px_rgba(91,91,247,0.35)] relative overflow-hidden border border-white/20 ios-gpu-layer">
           <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
           <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 

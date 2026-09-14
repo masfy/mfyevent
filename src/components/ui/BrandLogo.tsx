@@ -32,6 +32,13 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     xl: 'text-2xl',
   };
 
+  const pixelSizes = {
+    sm: 28,
+    md: 32,
+    lg: 40,
+    xl: 48,
+  };
+
   const isDark = theme === 'dark';
 
   const content = (
@@ -40,6 +47,10 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         <img
           src="/logo.png"
           alt="MfyEvent"
+          width={pixelSizes[size]}
+          height={pixelSizes[size]}
+          loading="eager"
+          decoding="async"
           className={`${squareSizes[size]} object-contain group-hover:scale-105 transition-transform duration-200`}
         />
       ) : (
@@ -47,6 +58,10 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           <img
             src="/logo.png"
             alt="MfyEvent"
+            width={pixelSizes[size]}
+            height={pixelSizes[size]}
+            loading="eager"
+            decoding="async"
             className={`${squareSizes[size]} object-contain group-hover:scale-105 transition-transform duration-200`}
           />
           <div className="flex flex-col text-left">

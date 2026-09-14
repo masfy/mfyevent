@@ -18,7 +18,12 @@ import {
   Sparkles,
   Activity,
 } from 'lucide-react';
-import { getStoredLinks, getStoredMicrosites, getStoredUser, isUserLoggedIn } from '@/lib/storage';
+import {
+  getUserStoredLinks,
+  getUserStoredMicrosites,
+  getStoredUser,
+  isUserLoggedIn,
+} from '@/lib/storage';
 import { ShortLink, Microsite, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
 import { MOCK_TRAFFIC_DATA, INITIAL_USER } from '@/lib/mockData';
@@ -43,9 +48,10 @@ export default function MemberDashboardPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadData = () => {
-    setLinks(getStoredLinks());
-    setMicrosites(getStoredMicrosites());
-    setUser(getStoredUser());
+    const currentUser = getStoredUser();
+    setUser(currentUser);
+    setLinks(getUserStoredLinks(currentUser));
+    setMicrosites(getUserStoredMicrosites(currentUser));
   };
 
   useEffect(() => {

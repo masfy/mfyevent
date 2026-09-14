@@ -18,7 +18,12 @@ import {
   MoreHorizontal,
   Calendar,
 } from 'lucide-react';
-import { getStoredLinks, saveStoredLinks, getStoredUser } from '@/lib/storage';
+import {
+  getUserStoredLinks,
+  deleteUserStoredLink,
+  toggleUserStoredLinkStatus,
+  getStoredUser,
+} from '@/lib/storage';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { ShortLink, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
@@ -39,8 +44,9 @@ export default function LinksManagementPage() {
   const [qrLink, setQrLink] = useState<ShortLink | null>(null);
 
   const loadData = () => {
-    setLinks(getStoredLinks());
-    setUser(getStoredUser());
+    const currentUser = getStoredUser();
+    setUser(currentUser);
+    setLinks(getUserStoredLinks(currentUser));
   };
 
   useEffect(() => {
@@ -67,22 +73,18 @@ export default function LinksManagementPage() {
   };
 
   const handleToggleStatus = (id: string) => {
-    const updated = links.map((l) => {
-      if (l.id === id) {
-        const nextStatus = l.status === 'ACTIVE' ? ('DISABLED' as const) : ('ACTIVE' as const);
-        return { ...l, status: nextStatus };
-      }
-      return l;
-    });
-    saveStoredLinks(updated);
-    showToast('Status link berhasil diperbarui');
+    const success = toggleUserStoredLinkStatus(id, user);
+    if (success) {
+      showToast('Status link berhasil diperbarui');
+    }
   };
 
   const handleDelete = (id: string, title: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus short link "${title}"?`)) {
-      const updated = links.filter((l) => l.id !== id);
-      saveStoredLinks(updated);
-      showToast('Short link berhasil dihapus');
+      const success = deleteUserStoredLink(id, user);
+      if (success) {
+        showToast('Short link berhasil dihapus');
+      }
     }
   };
 
