@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, LayoutTemplate, ShieldAlert } from 'lucide-react';
 import { MicrositeStudio } from '@/components/builder/MicrositeStudio';
 import { getStoredMicrosites, getStoredUser } from '@/lib/storage';
+import { fetchMicrositesFromFirestore } from '@/lib/firebase/firestore';
 import { isUserAdmin } from '@/lib/quota';
 import { Microsite } from '@/types';
 
@@ -21,11 +22,28 @@ export default function EditMicrositeStudioPage() {
     const user = getStoredUser();
     const isAdmin = isUserAdmin(user);
     const allSites = getStoredMicrosites();
-    const found = allSites.find((s) => s.id === siteId);
+    const found = allSites.find((s) => s.id === siteId || s.slug === siteId);
 
     if (!found) {
-      setSite(null);
-      setLoading(false);
+      fetchMicrositesFromFirestore()
+        .then((cloudSites) => {
+          const cloudFound = cloudSites.find((s) => s.id === siteId || s.slug === siteId);
+          if (cloudFound) {
+            if (!isAdmin && cloudFound.ownerId !== user.uid) {
+              setNotAuthorized(true);
+            } else {
+              setSite(cloudFound);
+            }
+          } else {
+            setSite(null);
+          }
+        })
+        .catch(() => {
+          setSite(null);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
       return;
     }
 

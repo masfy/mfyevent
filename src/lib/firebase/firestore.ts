@@ -8,6 +8,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  where,
   orderBy,
   deleteDoc,
   Unsubscribe,
@@ -239,12 +240,72 @@ export const syncLinkToFirestore = async (link: ShortLink): Promise<boolean> => 
   const db = getFirebaseFirestore();
   if (!db) return false;
 
+  const cleanSlug = (link.slug || '').trim().toLowerCase();
+  if (!cleanSlug) return false;
+
+  const payload: ShortLink = {
+    ...link,
+    slug: cleanSlug,
+    updatedAt: new Date().toISOString(),
+  };
+
   try {
-    const linkRef = doc(db, 'links', link.id || link.slug);
-    await setDoc(linkRef, link, { merge: true });
+    const linkRef = doc(db, 'links', cleanSlug);
+    await setDoc(linkRef, payload, { merge: true });
     return true;
   } catch (error) {
-    console.warn('Gagal menyimpan link ke Firestore:', error);
+    console.warn('[Firestore] Gagal menyimpan link ke Firestore:', error);
+    return false;
+  }
+};
+
+export const fetchLinkBySlug = async (slug: string): Promise<ShortLink | null> => {
+  if (!slug) return null;
+  const clean = slug.trim().toLowerCase();
+
+  if (!isFirebaseConfigured()) {
+    const all = getStoredLinks();
+    return all.find((l) => l.slug.toLowerCase() === clean) || null;
+  }
+
+  const db = getFirebaseFirestore();
+  if (!db) {
+    const all = getStoredLinks();
+    return all.find((l) => l.slug.toLowerCase() === clean) || null;
+  }
+
+  try {
+    const docRef = doc(db, 'links', clean);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as ShortLink;
+    }
+
+    const q = query(collection(db, 'links'), where('slug', '==', clean));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) {
+      return querySnap.docs[0].data() as ShortLink;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[Firestore] Gagal mengambil link dari cloud:', error);
+    const all = getStoredLinks();
+    return all.find((l) => l.slug.toLowerCase() === clean) || null;
+  }
+};
+
+export const deleteLinkFromFirestore = async (slug: string): Promise<boolean> => {
+  if (!isFirebaseConfigured()) return false;
+  const db = getFirebaseFirestore();
+  if (!db) return false;
+
+  const clean = slug.trim().toLowerCase();
+  try {
+    await deleteDoc(doc(db, 'links', clean));
+    return true;
+  } catch (error) {
+    console.warn('[Firestore] Gagal menghapus link dari Firestore:', error);
     return false;
   }
 };
@@ -256,18 +317,21 @@ export const fetchLinksFromFirestore = async (): Promise<ShortLink[]> => {
 
   try {
     const snap = await getDocs(collection(db, 'links'));
-    if (snap.empty) return getStoredLinks();
+    const localLinks = getStoredLinks();
+    if (snap.empty) return localLinks;
 
     const cloudLinks: ShortLink[] = [];
     snap.forEach((d) => {
       cloudLinks.push(d.data() as ShortLink);
     });
 
-    if (cloudLinks.length > 0) {
-      saveStoredLinks(cloudLinks);
-      return cloudLinks;
-    }
-    return getStoredLinks();
+    const map = new Map<string, ShortLink>();
+    localLinks.forEach((l) => map.set(l.slug.toLowerCase(), l));
+    cloudLinks.forEach((l) => map.set(l.slug.toLowerCase(), l));
+
+    const merged = Array.from(map.values());
+    saveStoredLinks(merged);
+    return merged;
   } catch (error) {
     console.warn('Gagal mengambil links dari Firestore:', error);
     return getStoredLinks();
@@ -285,14 +349,104 @@ export const syncMicrositeToFirestore = async (site: Microsite): Promise<boolean
   const db = getFirebaseFirestore();
   if (!db) return false;
 
+  const cleanSlug = (site.slug || '').trim().toLowerCase().replace(/^@/, '');
+  if (!cleanSlug) return false;
+
+  const payload: Microsite = {
+    ...site,
+    slug: cleanSlug,
+    updatedAt: new Date().toISOString(),
+  };
+
   try {
-    const siteRef = doc(db, 'microsites', site.id || site.slug);
-    await setDoc(siteRef, site, { merge: true });
+    // Simpan dokumen dengan ID cleanSlug agar pencarian publik cepat & pasti
+    const siteRef = doc(db, 'microsites', cleanSlug);
+    await setDoc(siteRef, payload, { merge: true });
+    console.log(`[Firestore] Berhasil menyimpan microsite @${cleanSlug} ke cloud.`);
     return true;
   } catch (error) {
-    console.warn('Gagal menyimpan microsite ke Firestore:', error);
+    console.warn(`[Firestore] Gagal menyimpan microsite @${cleanSlug}:`, error);
     return false;
   }
+};
+
+export const fetchMicrositeBySlug = async (slug: string): Promise<Microsite | null> => {
+  if (!slug) return null;
+  const cleanSlug = slug.trim().toLowerCase().replace(/^@/, '');
+  if (!cleanSlug) return null;
+
+  if (!isFirebaseConfigured()) {
+    const all = getStoredMicrosites();
+    return all.find((s) => s.slug.toLowerCase() === cleanSlug) || null;
+  }
+
+  const db = getFirebaseFirestore();
+  if (!db) {
+    const all = getStoredMicrosites();
+    return all.find((s) => s.slug.toLowerCase() === cleanSlug) || null;
+  }
+
+  try {
+    // 1. Coba ambil langsung berdasarkan doc ID (karena disimpan dengan id = cleanSlug)
+    const docRef = doc(db, 'microsites', cleanSlug);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as Microsite;
+    }
+
+    // 2. Fallback query jika dokumen lama disimpan dengan ID custom
+    const q = query(collection(db, 'microsites'), where('slug', '==', cleanSlug));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) {
+      return querySnap.docs[0].data() as Microsite;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[Firestore] Gagal mengambil microsite dari cloud:', error);
+    const all = getStoredMicrosites();
+    return all.find((s) => s.slug.toLowerCase() === cleanSlug) || null;
+  }
+};
+
+export const deleteMicrositeFromFirestore = async (slugOrId: string): Promise<boolean> => {
+  if (!isFirebaseConfigured()) return false;
+  const db = getFirebaseFirestore();
+  if (!db) return false;
+
+  const clean = slugOrId.trim().toLowerCase().replace(/^@/, '');
+  try {
+    await deleteDoc(doc(db, 'microsites', clean));
+    return true;
+  } catch (error) {
+    console.warn('[Firestore] Gagal menghapus microsite dari Firestore:', error);
+    return false;
+  }
+};
+
+/**
+ * Otomatis menyinkronkan seluruh microsite berstatus PUBLISHED di LocalStorage ke Cloud Firestore
+ */
+export const syncLocalMicrositesToCloud = async (currentUser?: User | null): Promise<number> => {
+  if (!isFirebaseConfigured()) return 0;
+  const localSites = getStoredMicrosites();
+  if (!localSites || localSites.length === 0) return 0;
+
+  let count = 0;
+  for (const site of localSites) {
+    const isOwner =
+      !currentUser ||
+      !site.ownerId ||
+      site.ownerId === currentUser.uid ||
+      currentUser.role === 'ADMIN' ||
+      currentUser.role === 'SUPER_ADMIN';
+
+    if (site.status === 'PUBLISHED' && isOwner) {
+      const ok = await syncMicrositeToFirestore(site);
+      if (ok) count++;
+    }
+  }
+  return count;
 };
 
 export const fetchMicrositesFromFirestore = async (): Promise<Microsite[]> => {
@@ -302,18 +456,23 @@ export const fetchMicrositesFromFirestore = async (): Promise<Microsite[]> => {
 
   try {
     const snap = await getDocs(collection(db, 'microsites'));
-    if (snap.empty) return getStoredMicrosites();
+    const localSites = getStoredMicrosites();
+
+    if (snap.empty) return localSites;
 
     const cloudSites: Microsite[] = [];
     snap.forEach((d) => {
       cloudSites.push(d.data() as Microsite);
     });
 
-    if (cloudSites.length > 0) {
-      saveStoredMicrosites(cloudSites);
-      return cloudSites;
-    }
-    return getStoredMicrosites();
+    // Merge: padukan data cloud dengan data lokal
+    const map = new Map<string, Microsite>();
+    localSites.forEach((s) => map.set(s.slug.toLowerCase(), s));
+    cloudSites.forEach((s) => map.set(s.slug.toLowerCase(), s));
+
+    const merged = Array.from(map.values());
+    saveStoredMicrosites(merged);
+    return merged;
   } catch (error) {
     console.warn('Gagal mengambil microsites dari Firestore:', error);
     return getStoredMicrosites();

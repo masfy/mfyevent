@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getStoredLinks, saveStoredLinks, getStoredMicrosites } from '@/lib/storage';
+import { getStoredLinks, saveStoredLinks, getStoredMicrosites, saveStoredMicrosites } from '@/lib/storage';
 import { INITIAL_LINKS, INITIAL_MICROSITES } from '@/lib/mockData';
+import { fetchMicrositeBySlug, fetchLinkBySlug } from '@/lib/firebase/firestore';
 import { ShortLink, Microsite } from '@/types';
 import Link from 'next/link';
 import { ExternalLink, AlertCircle, Clock, Ban, ArrowRight } from 'lucide-react';
@@ -23,53 +24,97 @@ export default function ShortLinkRedirectPage() {
     if (!rawSlug) return;
     const decoded = decodeURIComponent(rawSlug).toLowerCase();
 
-    // Check if it's a microsite handle request (e.g. @masalfy)
+    // 1. Kasus A: Akses Microsite dengan awalan @ (misal: /@digi-hsu atau /@masalfy)
     if (decoded.startsWith('@')) {
       const msSlug = decoded.substring(1);
       const allSites = getStoredMicrosites();
-      const foundSite =
+      const localSite =
         allSites.find((s) => s.slug.toLowerCase() === msSlug) ||
         INITIAL_MICROSITES.find((s) => s.slug.toLowerCase() === msSlug);
 
-      if (foundSite) {
-        setMicrosite(foundSite);
+      if (localSite) {
+        setMicrosite(localSite);
+        setLoading(false);
       }
-      setLoading(false);
+
+      fetchMicrositeBySlug(msSlug)
+        .then((cloudSite) => {
+          if (cloudSite) {
+            setMicrosite(cloudSite);
+            const current = getStoredMicrosites();
+            saveStoredMicrosites([
+              cloudSite,
+              ...current.filter((s) => s.slug.toLowerCase() !== msSlug),
+            ]);
+          } else if (!localSite) {
+            setMicrosite(null);
+          }
+        })
+        .finally(() => {
+          setLoading(false);
+        });
       return;
     }
 
+    // 2. Kasus B: Akses Short Link atau Microsite tanpa @ (misal: /digi-hsu)
     const cleanSlug = decoded;
     const allLinks = getStoredLinks();
-    const found =
+    const localLink =
       allLinks.find((l) => l.slug.toLowerCase() === cleanSlug) ||
       INITIAL_LINKS.find((l) => l.slug.toLowerCase() === cleanSlug);
 
-    if (found) {
-      setLink(found);
-
-      // Check active and not expired
-      if (found.status === 'ACTIVE') {
-        const isExpired = found.expiresAt && new Date(found.expiresAt).getTime() < Date.now();
+    const handleLinkRedirect = (targetLink: ShortLink) => {
+      setLink(targetLink);
+      if (targetLink.status === 'ACTIVE') {
+        const isExpired = targetLink.expiresAt && new Date(targetLink.expiresAt).getTime() < Date.now();
         if (!isExpired) {
           try {
-            if (!found.metrics) found.metrics = { totalClicks: 0, uniqueVisitors: 0 };
-            found.metrics.totalClicks = (found.metrics.totalClicks || 0) + 1;
-            const updated = allLinks.map((l) => (l.id === found.id ? found : l));
+            if (!targetLink.metrics) targetLink.metrics = { totalClicks: 0, uniqueVisitors: 0 };
+            targetLink.metrics.totalClicks = (targetLink.metrics.totalClicks || 0) + 1;
+            const updated = allLinks.map((l) => (l.id === targetLink.id ? targetLink : l));
             saveStoredLinks(updated);
           } catch {
             // ignore
           }
 
           setRedirecting(true);
-          // Redirect visitor immediately
           const timer = setTimeout(() => {
-            window.location.href = found.destinationUrl;
+            window.location.href = targetLink.destinationUrl;
           }, 800);
           return () => clearTimeout(timer);
         }
       }
+    };
+
+    if (localLink) {
+      handleLinkRedirect(localLink);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Cari di cloud: cek link terlebih dahulu, jika bukan link cek apakah ini microsite
+    fetchLinkBySlug(cleanSlug)
+      .then(async (cloudLink) => {
+        if (cloudLink) {
+          handleLinkRedirect(cloudLink);
+        } else {
+          // Fallback: periksa apakah ada microsite dengan slug ini
+          const cloudSite = await fetchMicrositeBySlug(cleanSlug);
+          if (cloudSite) {
+            setMicrosite(cloudSite);
+          } else {
+            const allSites = getStoredMicrosites();
+            const localSite = allSites.find((s) => s.slug.toLowerCase() === cleanSlug);
+            if (localSite) setMicrosite(localSite);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('[ShortLinkRedirectPage] Gagal memuat dari cloud:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [rawSlug]);
 
   if (redirecting && link) {

@@ -6,6 +6,8 @@ import { PREBUILT_THEMES } from '@/lib/mockData';
 import { PublicMicrositeView } from '@/components/microsite/PublicMicrositeView';
 import { useToast } from '@/components/ui/Toast';
 import { saveStoredMicrosites, getStoredMicrosites } from '@/lib/storage';
+import { syncMicrositeToFirestore } from '@/lib/firebase/firestore';
+import { getFirebaseAuth } from '@/lib/firebase/config';
 import { normalizeSlug, isSlugReserved } from '@/lib/utils';
 import confetti from 'canvas-confetti';
 import {
@@ -66,12 +68,22 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
   // Autosave with debounce (PRD Section 46 & 89)
   useEffect(() => {
     setSaveStatus('SAVING');
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const allSites = getStoredMicrosites();
       const updated = allSites.map((s) => (s.id === site.id ? site : s));
       saveStoredMicrosites(updated);
+
+      // Jika statusnya PUBLISHED, sinkronkan ke cloud secara otomatis
+      if (site.status === 'PUBLISHED') {
+        try {
+          await syncMicrositeToFirestore(site);
+        } catch {
+          // ignore background autosave errors
+        }
+      }
+
       setSaveStatus('SAVED');
-    }, 600);
+    }, 700);
 
     return () => clearTimeout(timer);
   }, [site]);
@@ -234,7 +246,10 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
     updateSiteState({ ...site, blocks: reordered });
   };
 
-  const handlePublish = () => {
+  const [publishing, setPublishing] = useState(false);
+
+  const handlePublish = async () => {
+    setPublishing(true);
     const publishedSite: Microsite = {
       ...site,
       status: 'PUBLISHED',
@@ -242,17 +257,44 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
     };
     updateSiteState(publishedSite);
 
+    // 1. Simpan ke LocalStorage
+    const allSites = getStoredMicrosites();
+    const updated = allSites.map((s) => (s.id === site.id ? publishedSite : s));
+    saveStoredMicrosites(updated);
+
+    // 2. Sinkronkan langsung ke Cloud Firestore agar instan bisa diakses publik
+    let cloudSynced = false;
+    try {
+      cloudSynced = await syncMicrositeToFirestore(publishedSite);
+    } catch (err) {
+      console.warn('[handlePublish] Gagal sinkronisasi ke cloud:', err);
+    }
+
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
     });
 
-    showToast('Microsite berhasil dipublikasikan secara live! 🎉', 'success');
+    const auth = getFirebaseAuth();
+    const isFirebaseLoggedIn = Boolean(auth?.currentUser);
+
+    if (cloudSynced) {
+      showToast('Microsite berhasil dipublikasikan secara live ke cloud! 🌐🎉', 'success');
+    } else if (!isFirebaseLoggedIn) {
+      showToast(
+        'Microsite tersimpan lokal. Masuk dengan Akun Google agar microsite dapat diakses umum oleh orang lain.',
+        'warning'
+      );
+    } else {
+      showToast('Microsite dipublikasikan secara lokal (gagal tersambung ke cloud).', 'warning');
+    }
+    setPublishing(false);
   };
 
   const handleCopyPublicUrl = () => {
-    const url = `https://event.mfytech.my.id/@${site.slug}`;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://event.mfytech.my.id';
+    const url = `${origin}/@${site.slug}`;
     navigator.clipboard.writeText(url);
     showToast('Link publik disalin ke clipboard! 📋');
   };
@@ -331,10 +373,15 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
 
           <button
             onClick={handlePublish}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#5B5BF7] to-[#06B6D4] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all"
+            disabled={publishing}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#5B5BF7] to-[#06B6D4] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all disabled:opacity-60 cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Publikasikan</span>
+            {publishing ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            <span>{publishing ? 'Menyinkronkan...' : 'Publikasikan'}</span>
           </button>
         </div>
       </div>

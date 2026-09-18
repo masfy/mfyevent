@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { cleanShortSlug, generateRandomSlug, isSlugReserved } from '@/lib/utils';
 import { getStoredLinks, saveStoredLinks, getStoredUser, getUserStoredLinks } from '@/lib/storage';
+import { syncLinkToFirestore } from '@/lib/firebase/firestore';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { ShortLink } from '@/types';
 import { useToast } from '@/components/ui/Toast';
@@ -158,6 +159,11 @@ export const CreateLinkModal: React.FC<CreateLinkModalProps> = ({
 
     const updated = [newLink, ...currentLinks];
     saveStoredLinks(updated);
+
+    // Sinkronkan ke Cloud Firestore
+    syncLinkToFirestore(newLink).catch((err) => {
+      console.warn('[CreateLinkModal] Gagal sinkron link ke Firestore:', err);
+    });
 
     // Trigger celebration confetti
     confetti({

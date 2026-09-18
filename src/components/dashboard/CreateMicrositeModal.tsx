@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { normalizeSlug, isSlugReserved } from '@/lib/utils';
 import { getStoredMicrosites, saveStoredMicrosites, getStoredUser, getUserStoredMicrosites } from '@/lib/storage';
+import { syncMicrositeToFirestore } from '@/lib/firebase/firestore';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { Microsite } from '@/types';
 import { PREBUILT_THEMES } from '@/lib/mockData';
@@ -124,6 +125,11 @@ export const CreateMicrositeModal: React.FC<CreateMicrositeModalProps> = ({
 
     const existing = getStoredMicrosites();
     saveStoredMicrosites([newSite, ...existing]);
+
+    // Sinkronkan ke Cloud Firestore
+    syncMicrositeToFirestore(newSite).catch((err) => {
+      console.warn('[CreateMicrositeModal] Gagal sinkron ke Firestore:', err);
+    });
 
     setIsSubmitting(false);
     showToast('Microsite berhasil dibuat! Membuka Studio Builder...', 'success');

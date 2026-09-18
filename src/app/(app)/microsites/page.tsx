@@ -18,6 +18,7 @@ import {
   deleteUserStoredMicrosite,
   getStoredUser,
 } from '@/lib/storage';
+import { fetchMicrositesFromFirestore, deleteMicrositeFromFirestore } from '@/lib/firebase/firestore';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { Microsite, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
@@ -39,6 +40,7 @@ export default function MicrositesListPage() {
 
   useEffect(() => {
     loadData();
+    fetchMicrositesFromFirestore().catch(() => {});
     window.addEventListener('mfy_storage_update', loadData);
     return () => window.removeEventListener('mfy_storage_update', loadData);
   }, []);
@@ -54,7 +56,8 @@ export default function MicrositesListPage() {
   };
 
   const handleCopy = (slug: string) => {
-    navigator.clipboard.writeText(`https://event.mfytech.my.id/@${slug}`);
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://event.mfytech.my.id';
+    navigator.clipboard.writeText(`${origin}/@${slug}`);
     setCopiedSlug(slug);
     showToast('Tautan publik microsite disalin! 📋');
     setTimeout(() => setCopiedSlug(null), 2000);
@@ -62,8 +65,12 @@ export default function MicrositesListPage() {
 
   const handleDelete = (id: string, title: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus microsite "${title}"?`)) {
+      const targetSite = microsites.find((m) => m.id === id);
       const success = deleteUserStoredMicrosite(id, user);
       if (success) {
+        if (targetSite) {
+          deleteMicrositeFromFirestore(targetSite.slug).catch(() => {});
+        }
         showToast('Microsite berhasil dihapus');
       }
     }

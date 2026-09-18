@@ -3,21 +3,30 @@
 import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/config';
-import { syncUserToFirestore } from '@/lib/firebase/firestore';
+import {
+  syncUserToFirestore,
+  syncLocalMicrositesToCloud,
+  fetchMicrositesFromFirestore,
+  fetchLinksFromFirestore,
+} from '@/lib/firebase/firestore';
 import { handleGoogleAuthSuccess, getStoredUser } from '@/lib/storage';
 
 /**
  * FirebaseObserver
  * Memantau status login pengguna secara realtime.
- * Jika pengguna terotentikasi di Firebase Auth:
- * 1. Menjaga profil lokal selalu tersinkronisasi
- * 2. Memastikan profil pengguna tersimpan otomatis di Cloud Firestore (agar terbaca di Admin Dashboard)
+ * 1. Menjaga profil lokal dan Firestore selalu sinkron
+ * 2. Mengunggah microsite lokal yang berstatus PUBLISHED ke Cloud Firestore
+ * 3. Mengambil microsite & short link terbaru dari cloud
  */
 export const FirebaseObserver = () => {
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
     const auth = getFirebaseAuth();
     if (!auth) return;
+
+    // Muat data publik terbaru dari cloud secara background
+    fetchMicrositesFromFirestore().catch(() => {});
+    fetchLinksFromFirestore().catch(() => {});
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser && fbUser.email) {
@@ -29,10 +38,20 @@ export const FirebaseObserver = () => {
             photoURL: fbUser.photoURL || undefined,
           });
 
-          // Otomatis sinkronkan ke Cloud Firestore
+          // 1. Otomatis sinkronkan profil user ke Cloud Firestore
           await syncUserToFirestore(appUser);
+
+          // 2. Otomatis unggah microsite lokal yang berstatus PUBLISHED ke Firestore
+          const syncedCount = await syncLocalMicrositesToCloud(appUser);
+          if (syncedCount > 0) {
+            console.log(`[FirebaseObserver] Berhasil menyinkronkan ${syncedCount} microsite ke cloud.`);
+          }
+
+          // 3. Ambil data terbaru dari cloud
+          await fetchMicrositesFromFirestore();
+          await fetchLinksFromFirestore();
         } catch (err) {
-          console.warn('[FirebaseObserver] Gagal sinkronisasi data user:', err);
+          console.warn('[FirebaseObserver] Gagal sinkronisasi data user/microsite:', err);
         }
       }
     });
@@ -42,3 +61,4 @@ export const FirebaseObserver = () => {
 
   return null;
 };
+
