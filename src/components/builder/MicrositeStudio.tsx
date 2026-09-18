@@ -9,6 +9,7 @@ import { saveStoredMicrosites, getStoredMicrosites } from '@/lib/storage';
 import { syncMicrositeToFirestore } from '@/lib/firebase/firestore';
 import { getFirebaseAuth } from '@/lib/firebase/config';
 import { normalizeSlug, isSlugReserved } from '@/lib/utils';
+import { compressImageFile } from '@/lib/imageOptimizer';
 import confetti from 'canvas-confetti';
 import {
   Smartphone,
@@ -114,57 +115,62 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
   };
 
   // Image Upload Handlers with 1 MB Limit
-  const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB (1,048,576 bytes)
+  // Image Upload Handlers with Automatic Lightweight Compression
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // Menerima file hingga 5 MB dan otomatis dikompres ke < 50 KB
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      showToast(`Ukuran foto profil (${sizeMb} MB) melebihi batas maksimal 1 MB!`, 'error');
+      showToast(`Ukuran foto profil (${sizeMb} MB) melebihi batas maksimal 5 MB!`, 'error');
       e.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        updateSiteState({
-          ...site,
-          profile: { ...site.profile, avatarUrl: base64 },
-        });
-        showToast('Foto profil berhasil diunggah! (Maks 1 MB)', 'success');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, {
+        maxWidth: 400,
+        maxHeight: 400,
+        quality: 0.85,
+      });
+      updateSiteState({
+        ...site,
+        profile: { ...site.profile, avatarUrl: compressed },
+      });
+      showToast('Foto profil berhasil diunggah & dioptimalkan! ✨', 'success');
+    } catch {
+      showToast('Gagal memproses foto profil.', 'error');
+    }
     e.target.value = '';
   };
 
-  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      showToast(`Ukuran foto sampul (${sizeMb} MB) melebihi batas maksimal 1 MB!`, 'error');
+      showToast(`Ukuran foto sampul (${sizeMb} MB) melebihi batas maksimal 5 MB!`, 'error');
       e.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        updateSiteState({
-          ...site,
-          profile: { ...site.profile, coverUrl: base64 },
-        });
-        showToast('Foto sampul berhasil diunggah! (Maks 1 MB)', 'success');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, {
+        maxWidth: 1200,
+        maxHeight: 600,
+        quality: 0.80,
+      });
+      updateSiteState({
+        ...site,
+        profile: { ...site.profile, coverUrl: compressed },
+      });
+      showToast('Foto sampul berhasil diunggah & dioptimalkan! ✨', 'success');
+    } catch {
+      showToast('Gagal memproses foto sampul.', 'error');
+    }
     e.target.value = '';
   };
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '@/types';
 import { getStoredUser, saveStoredUser, GUEST_USER } from '@/lib/storage';
+import { compressImageFile } from '@/lib/imageOptimizer';
 import { useToast } from '@/components/ui/Toast';
 import {
   User as UserIcon,
@@ -96,7 +97,7 @@ export default function SettingsPage() {
     return () => window.removeEventListener('mfy_storage_update', handleStorageUpdate);
   }, []);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -108,17 +109,19 @@ export default function SettingsPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        const updated = { ...user, photoURL: base64, updatedAt: new Date().toISOString() };
-        saveStoredUser(updated);
-        setUser(updated);
-        showToast('Foto profil akun berhasil diperbarui! (Maks 1 MB)', 'success');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, {
+        maxWidth: 400,
+        maxHeight: 400,
+        quality: 0.85,
+      });
+      const updated = { ...user, photoURL: compressed, updatedAt: new Date().toISOString() };
+      saveStoredUser(updated);
+      setUser(updated);
+      showToast('Foto profil akun berhasil diperbarui & dioptimalkan! ✨', 'success');
+    } catch {
+      showToast('Gagal memproses foto profil.', 'error');
+    }
     e.target.value = '';
   };
 

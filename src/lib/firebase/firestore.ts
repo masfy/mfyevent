@@ -16,6 +16,7 @@ import {
 import { getFirebaseFirestore, isFirebaseConfigured, PRIMARY_ADMIN_EMAIL } from './config';
 import { User, ShortLink, Microsite } from '@/types';
 import { saveStoredUsers, getStoredUsers, saveStoredLinks, getStoredLinks, saveStoredMicrosites, getStoredMicrosites } from '@/lib/storage';
+import { compressBase64Image } from '@/lib/imageOptimizer';
 
 /**
  * =========================================================================
@@ -249,9 +250,11 @@ export const syncLinkToFirestore = async (link: ShortLink): Promise<boolean> => 
     updatedAt: new Date().toISOString(),
   };
 
+  const safePayload = JSON.parse(JSON.stringify(payload));
+
   try {
     const linkRef = doc(db, 'links', cleanSlug);
-    await setDoc(linkRef, payload, { merge: true });
+    await setDoc(linkRef, safePayload, { merge: true });
     return true;
   } catch (error) {
     console.warn('[Firestore] Gagal menyimpan link ke Firestore:', error);
@@ -364,16 +367,69 @@ export const syncMicrositeToFirestore = async (site: Microsite): Promise<Firesto
     return { success: false, error: 'Slug microsite kosong.' };
   }
 
+  // 1. Optimasi & Kompresi Foto Profil / Sampul jika berupa Base64 besar
+  let optimizedProfile = { ...(site.profile || { name: site.title, bio: '', avatarUrl: '', verified: false }) };
+  let imageCompressed = false;
+
+  if (typeof window !== 'undefined') {
+    if (optimizedProfile.avatarUrl?.startsWith('data:image/') && optimizedProfile.avatarUrl.length > 60000) {
+      try {
+        const compressed = await compressBase64Image(optimizedProfile.avatarUrl, {
+          maxWidth: 400,
+          maxHeight: 400,
+          quality: 0.85,
+        });
+        if (compressed && compressed !== optimizedProfile.avatarUrl) {
+          optimizedProfile.avatarUrl = compressed;
+          imageCompressed = true;
+        }
+      } catch (err) {
+        console.warn('[Firestore] Gagal mengompres avatar:', err);
+      }
+    }
+
+    if (optimizedProfile.coverUrl?.startsWith('data:image/') && optimizedProfile.coverUrl.length > 60000) {
+      try {
+        const compressed = await compressBase64Image(optimizedProfile.coverUrl, {
+          maxWidth: 1200,
+          maxHeight: 600,
+          quality: 0.80,
+        });
+        if (compressed && compressed !== optimizedProfile.coverUrl) {
+          optimizedProfile.coverUrl = compressed;
+          imageCompressed = true;
+        }
+      } catch (err) {
+        console.warn('[Firestore] Gagal mengompres cover:', err);
+      }
+    }
+  }
+
   const payload: Microsite = {
     ...site,
     slug: cleanSlug,
+    profile: optimizedProfile,
     updatedAt: new Date().toISOString(),
   };
+
+  // Jika ada kompresi gambar, sinkronkan balik ke localStorage agar ringan
+  if (imageCompressed && typeof window !== 'undefined') {
+    try {
+      const all = getStoredMicrosites();
+      const updated = all.map((s) => (s.id === site.id || s.slug === cleanSlug ? payload : s));
+      saveStoredMicrosites(updated);
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Sanitasi payload: Hilangkan nilai undefined agar tidak memicu error schema di Firestore
+  const safePayload = JSON.parse(JSON.stringify(payload));
 
   try {
     // Simpan dokumen dengan ID cleanSlug agar pencarian publik cepat & pasti
     const siteRef = doc(db, 'microsites', cleanSlug);
-    await setDoc(siteRef, payload, { merge: true });
+    await setDoc(siteRef, safePayload, { merge: true });
     console.log(`[Firestore] Berhasil menyimpan microsite @${cleanSlug} ke cloud.`);
     return { success: true };
   } catch (error: any) {
@@ -381,6 +437,8 @@ export const syncMicrositeToFirestore = async (site: Microsite): Promise<Firesto
     let message = error?.message || 'Gagal menyimpan ke Firestore.';
     if (error?.code === 'permission-denied' || message.includes('permission')) {
       message = 'Izin ditolak (Permission Denied). Harap perbarui Firestore Rules di Firebase Console agar mengizinkan penulisan.';
+    } else if (message.includes('invalid nested entity') || message.includes('INVALID_ARGUMENT')) {
+      message = 'Ukuran/format data profile terlalu besar atau tidak didukung Firestore. Sistem telah otomatis mengompres foto profil Anda, silakan coba simpan sekali lagi.';
     }
     return { success: false, error: message, code: error?.code };
   }
