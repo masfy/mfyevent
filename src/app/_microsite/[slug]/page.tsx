@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { PublicMicrositeView } from '@/components/microsite/PublicMicrositeView';
 import { getStoredMicrosites, saveStoredMicrosites } from '@/lib/storage';
-import { fetchMicrositeBySlug } from '@/lib/firebase/firestore';
+import { fetchMicrositeBySlug, syncMicrositeToFirestore } from '@/lib/firebase/firestore';
 import { INITIAL_MICROSITES } from '@/lib/mockData';
 import { Microsite } from '@/types';
 import Link from 'next/link';
@@ -28,6 +28,11 @@ export default function PublicMicrositePage() {
     if (localFound) {
       setMicrosite(localFound);
       setLoading(false);
+
+      // Otomatis coba sinkronkan data lokal ke Cloud Firestore
+      if (localFound.status === 'PUBLISHED') {
+        syncMicrositeToFirestore(localFound).catch(() => {});
+      }
     }
 
     // 2. Ambil versi resmi & terbaru dari Cloud Firestore

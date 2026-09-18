@@ -42,9 +42,9 @@ export const FirebaseObserver = () => {
           await syncUserToFirestore(appUser);
 
           // 2. Otomatis unggah microsite lokal yang berstatus PUBLISHED ke Firestore
-          const syncedCount = await syncLocalMicrositesToCloud(appUser);
-          if (syncedCount > 0) {
-            console.log(`[FirebaseObserver] Berhasil menyinkronkan ${syncedCount} microsite ke cloud.`);
+          const syncRes = await syncLocalMicrositesToCloud(appUser);
+          if (syncRes.synced > 0) {
+            console.log(`[FirebaseObserver] Berhasil menyinkronkan ${syncRes.synced} microsite ke cloud.`);
           }
 
           // 3. Ambil data terbaru dari cloud

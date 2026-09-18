@@ -58,7 +58,7 @@ export const CreateMicrositeModal: React.FC<CreateMicrositeModalProps> = ({
     }
   }, [slug]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanSlug = normalizeSlug(slug);
@@ -127,12 +127,18 @@ export const CreateMicrositeModal: React.FC<CreateMicrositeModalProps> = ({
     saveStoredMicrosites([newSite, ...existing]);
 
     // Sinkronkan ke Cloud Firestore
-    syncMicrositeToFirestore(newSite).catch((err) => {
-      console.warn('[CreateMicrositeModal] Gagal sinkron ke Firestore:', err);
-    });
-
+    const cloudRes = await syncMicrositeToFirestore(newSite);
     setIsSubmitting(false);
-    showToast('Microsite berhasil dibuat! Membuka Studio Builder...', 'success');
+
+    if (cloudRes.success) {
+      showToast('Microsite berhasil dibuat & tersimpan di cloud! 🎉', 'success');
+    } else {
+      showToast(
+        `Microsite tersimpan lokal. Cloud: ${cloudRes.error || 'Periksa Firebase Rules'}`,
+        'warning'
+      );
+    }
+
     if (onCreated) onCreated(newSite);
     onClose();
     router.push(`/microsites/${newSite.id}/edit`);

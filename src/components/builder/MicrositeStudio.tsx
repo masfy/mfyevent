@@ -263,11 +263,11 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
     saveStoredMicrosites(updated);
 
     // 2. Sinkronkan langsung ke Cloud Firestore agar instan bisa diakses publik
-    let cloudSynced = false;
+    let cloudResult: { success: boolean; error?: string } = { success: false, error: '' };
     try {
-      cloudSynced = await syncMicrositeToFirestore(publishedSite);
-    } catch (err) {
-      console.warn('[handlePublish] Gagal sinkronisasi ke cloud:', err);
+      cloudResult = await syncMicrositeToFirestore(publishedSite);
+    } catch (err: any) {
+      cloudResult = { success: false, error: err?.message };
     }
 
     confetti({
@@ -276,18 +276,13 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
       origin: { y: 0.6 },
     });
 
-    const auth = getFirebaseAuth();
-    const isFirebaseLoggedIn = Boolean(auth?.currentUser);
-
-    if (cloudSynced) {
+    if (cloudResult.success) {
       showToast('Microsite berhasil dipublikasikan secara live ke cloud! 🌐🎉', 'success');
-    } else if (!isFirebaseLoggedIn) {
+    } else {
       showToast(
-        'Microsite tersimpan lokal. Masuk dengan Akun Google agar microsite dapat diakses umum oleh orang lain.',
+        `Microsite tersimpan lokal. Cloud: ${cloudResult.error || 'Periksa Firestore Rules di Firebase Console'}`,
         'warning'
       );
-    } else {
-      showToast('Microsite dipublikasikan secara lokal (gagal tersambung ke cloud).', 'warning');
     }
     setPublishing(false);
   };

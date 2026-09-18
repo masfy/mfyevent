@@ -12,13 +12,18 @@ import {
   Share2,
   Copy,
   Check,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getUserStoredMicrosites,
   deleteUserStoredMicrosite,
   getStoredUser,
 } from '@/lib/storage';
-import { fetchMicrositesFromFirestore, deleteMicrositeFromFirestore } from '@/lib/firebase/firestore';
+import {
+  fetchMicrositesFromFirestore,
+  deleteMicrositeFromFirestore,
+  syncLocalMicrositesToCloud,
+} from '@/lib/firebase/firestore';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { Microsite, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
@@ -31,11 +36,31 @@ export default function MicrositesListPage() {
   const [user, setUser] = useState<User | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  const [syncingCloud, setSyncingCloud] = useState(false);
 
   const loadData = () => {
     const currentUser = getStoredUser();
     setUser(currentUser);
     setMicrosites(getUserStoredMicrosites(currentUser));
+  };
+
+  const handleManualSync = async () => {
+    setSyncingCloud(true);
+    try {
+      const res = await syncLocalMicrositesToCloud(user);
+      if (res.synced > 0) {
+        showToast(`Berhasil menyinkronkan ${res.synced} microsite ke Cloud Firestore! ☁️🎉`, 'success');
+      } else if (res.failed > 0) {
+        showToast(`Gagal sinkron: ${res.errors[0] || 'Periksa Firebase Rules'}`, 'error');
+      } else {
+        showToast('Semua microsite lokal sudah tersimpan di Cloud Firestore! ✨', 'info');
+      }
+      await fetchMicrositesFromFirestore();
+    } catch (err: any) {
+      showToast('Gagal sinkronisasi: ' + err.message, 'error');
+    } finally {
+      setSyncingCloud(false);
+    }
   };
 
   useEffect(() => {
@@ -103,13 +128,25 @@ export default function MicrositesListPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#5B5BF7] to-[#06B6D4] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all cursor-pointer self-start sm:self-auto"
-        >
-          <Sparkles className="w-4 h-4 text-white" />
-          <span>Buat Microsite Baru</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleManualSync}
+            disabled={syncingCloud}
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-60"
+            title="Unggah seluruh microsite lokal ke Cloud Firestore"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${syncingCloud ? 'animate-spin' : ''}`} />
+            <span>{syncingCloud ? 'Menyinkronkan...' : 'Sinkron Cloud'}</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#5B5BF7] to-[#06B6D4] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all cursor-pointer self-start sm:self-auto"
+          >
+            <Sparkles className="w-4 h-4 text-white" />
+            <span>Buat Microsite Baru</span>
+          </button>
+        </div>
       </div>
 
       {/* Grid of Microsite Cards (PRD Section 39) */}

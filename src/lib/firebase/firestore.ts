@@ -344,13 +344,25 @@ export const fetchLinksFromFirestore = async (): Promise<ShortLink[]> => {
  * =========================================================================
  */
 
-export const syncMicrositeToFirestore = async (site: Microsite): Promise<boolean> => {
-  if (!isFirebaseConfigured()) return false;
+export interface FirestoreSyncResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+}
+
+export const syncMicrositeToFirestore = async (site: Microsite): Promise<FirestoreSyncResult> => {
+  if (!isFirebaseConfigured()) {
+    return { success: false, error: 'Firebase belum terkonfigurasi pada proyek.' };
+  }
   const db = getFirebaseFirestore();
-  if (!db) return false;
+  if (!db) {
+    return { success: false, error: 'Koneksi ke Firestore gagal diinisialisasi.' };
+  }
 
   const cleanSlug = (site.slug || '').trim().toLowerCase().replace(/^@/, '');
-  if (!cleanSlug) return false;
+  if (!cleanSlug) {
+    return { success: false, error: 'Slug microsite kosong.' };
+  }
 
   const payload: Microsite = {
     ...site,
@@ -363,10 +375,14 @@ export const syncMicrositeToFirestore = async (site: Microsite): Promise<boolean
     const siteRef = doc(db, 'microsites', cleanSlug);
     await setDoc(siteRef, payload, { merge: true });
     console.log(`[Firestore] Berhasil menyimpan microsite @${cleanSlug} ke cloud.`);
-    return true;
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.warn(`[Firestore] Gagal menyimpan microsite @${cleanSlug}:`, error);
-    return false;
+    let message = error?.message || 'Gagal menyimpan ke Firestore.';
+    if (error?.code === 'permission-denied' || message.includes('permission')) {
+      message = 'Izin ditolak (Permission Denied). Harap perbarui Firestore Rules di Firebase Console agar mengizinkan penulisan.';
+    }
+    return { success: false, error: message, code: error?.code };
   }
 };
 
@@ -424,15 +440,31 @@ export const deleteMicrositeFromFirestore = async (slugOrId: string): Promise<bo
   }
 };
 
+export interface LocalSyncResult {
+  total: number;
+  synced: number;
+  failed: number;
+  errors: string[];
+}
+
 /**
  * Otomatis menyinkronkan seluruh microsite berstatus PUBLISHED di LocalStorage ke Cloud Firestore
  */
-export const syncLocalMicrositesToCloud = async (currentUser?: User | null): Promise<number> => {
-  if (!isFirebaseConfigured()) return 0;
+export const syncLocalMicrositesToCloud = async (
+  currentUser?: User | null
+): Promise<LocalSyncResult> => {
+  if (!isFirebaseConfigured()) {
+    return { total: 0, synced: 0, failed: 0, errors: ['Firebase belum dikonfigurasi'] };
+  }
   const localSites = getStoredMicrosites();
-  if (!localSites || localSites.length === 0) return 0;
+  if (!localSites || localSites.length === 0) {
+    return { total: 0, synced: 0, failed: 0, errors: [] };
+  }
 
-  let count = 0;
+  let synced = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
   for (const site of localSites) {
     const isOwner =
       !currentUser ||
@@ -442,11 +474,19 @@ export const syncLocalMicrositesToCloud = async (currentUser?: User | null): Pro
       currentUser.role === 'SUPER_ADMIN';
 
     if (site.status === 'PUBLISHED' && isOwner) {
-      const ok = await syncMicrositeToFirestore(site);
-      if (ok) count++;
+      const res = await syncMicrositeToFirestore(site);
+      if (res.success) {
+        synced++;
+      } else {
+        failed++;
+        if (res.error && !errors.includes(res.error)) {
+          errors.push(res.error);
+        }
+      }
     }
   }
-  return count;
+
+  return { total: localSites.length, synced, failed, errors };
 };
 
 export const fetchMicrositesFromFirestore = async (): Promise<Microsite[]> => {
