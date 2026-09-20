@@ -78,6 +78,9 @@ export const CreateMicrositeModal: React.FC<CreateMicrositeModalProps> = ({
     const newSite: Microsite = {
       id: `ms_${cleanSlug}_${Date.now()}`,
       ownerId: currentUser.uid || 'usr_guest',
+      ownerEmail: currentUser.email || '',
+      ownerName: currentUser.displayName || title.trim() || cleanSlug,
+      ownerRole: currentUser.role || 'USER',
       slug: cleanSlug,
       title: title.trim() || `@${cleanSlug}`,
       status: 'PUBLISHED',

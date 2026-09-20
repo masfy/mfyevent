@@ -134,6 +134,9 @@ export interface MicrositeSEO {
 export interface Microsite {
   id: string;
   ownerId: string;
+  ownerEmail?: string;
+  ownerName?: string;
+  ownerRole?: UserRole;
   slug: string;
   title: string;
   status: 'PUBLISHED' | 'DRAFT' | 'SUSPENDED';

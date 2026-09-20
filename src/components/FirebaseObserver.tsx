@@ -5,7 +5,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/config';
 import {
   syncUserToFirestore,
-  syncLocalMicrositesToCloud,
   fetchMicrositesFromFirestore,
   fetchLinksFromFirestore,
 } from '@/lib/firebase/firestore';
@@ -41,13 +40,7 @@ export const FirebaseObserver = () => {
           // 1. Otomatis sinkronkan profil user ke Cloud Firestore
           await syncUserToFirestore(appUser);
 
-          // 2. Otomatis unggah microsite lokal yang berstatus PUBLISHED ke Firestore
-          const syncRes = await syncLocalMicrositesToCloud(appUser);
-          if (syncRes.synced > 0) {
-            console.log(`[FirebaseObserver] Berhasil menyinkronkan ${syncRes.synced} microsite ke cloud.`);
-          }
-
-          // 3. Ambil data terbaru dari cloud
+          // 2. Ambil data terbaru langsung dari cloud
           await fetchMicrositesFromFirestore();
           await fetchLinksFromFirestore();
         } catch (err) {

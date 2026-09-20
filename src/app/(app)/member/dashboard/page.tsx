@@ -22,8 +22,14 @@ import {
   getUserStoredLinks,
   getUserStoredMicrosites,
   getStoredUser,
+  getStoredLinks,
+  getStoredMicrosites,
   isUserLoggedIn,
 } from '@/lib/storage';
+import {
+  subscribeMicrositesFromFirestore,
+  subscribeLinksFromFirestore,
+} from '@/lib/firebase/firestore';
 import { ShortLink, Microsite, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
 import { MOCK_TRAFFIC_DATA, INITIAL_USER } from '@/lib/mockData';
@@ -50,8 +56,14 @@ export default function MemberDashboardPage() {
   const loadData = () => {
     const currentUser = getStoredUser();
     setUser(currentUser);
-    setLinks(getUserStoredLinks(currentUser));
-    setMicrosites(getUserStoredMicrosites(currentUser));
+    const userLinks = (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN')
+      ? getStoredLinks().filter((l) => l.ownerId === currentUser.uid)
+      : getUserStoredLinks(currentUser);
+    const userSites = (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN')
+      ? getStoredMicrosites().filter((m) => m.ownerId === currentUser.uid)
+      : getUserStoredMicrosites(currentUser);
+    setLinks(userLinks);
+    setMicrosites(userSites);
   };
 
   useEffect(() => {
@@ -60,8 +72,31 @@ export default function MemberDashboardPage() {
       return;
     }
     loadData();
+
+    // Berlangganan real-time links dari Firestore
+    const unsubLinks = subscribeLinksFromFirestore((liveLinks) => {
+      const currentUser = getStoredUser();
+      const userLinks = (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN')
+        ? liveLinks.filter((l) => l.ownerId === currentUser.uid)
+        : liveLinks.filter((l) => l.ownerId === currentUser.uid);
+      setLinks(userLinks);
+    });
+
+    // Berlangganan real-time microsites dari Firestore
+    const unsubSites = subscribeMicrositesFromFirestore((liveSites) => {
+      const currentUser = getStoredUser();
+      const userSites = (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN')
+        ? liveSites.filter((m) => m.ownerId === currentUser.uid)
+        : liveSites.filter((m) => m.ownerId === currentUser.uid);
+      setMicrosites(userSites);
+    });
+
     window.addEventListener('mfy_storage_update', loadData);
-    return () => window.removeEventListener('mfy_storage_update', loadData);
+    return () => {
+      window.removeEventListener('mfy_storage_update', loadData);
+      if (unsubLinks) unsubLinks();
+      if (unsubSites) unsubSites();
+    };
   }, [router]);
 
   const totalClicks = links.reduce((sum, l) => sum + l.metrics.totalClicks, 0);

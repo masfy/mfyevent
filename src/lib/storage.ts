@@ -12,7 +12,7 @@ const STORAGE_KEYS = {
   AUDIT: 'mfy_event_audit',
 };
 
-const MOCK_CLEANUP_VERSION = 'mfy_auth_clean_v3';
+const MOCK_CLEANUP_VERSION = 'mfy_auth_clean_v4';
 
 /**
  * Otomatis membersihkan sisa mock data dari LocalStorage peramban

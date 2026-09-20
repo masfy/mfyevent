@@ -50,6 +50,8 @@ import {
   fetchUsersFromFirestore,
   subscribeUsersFromFirestore,
   deleteUserFromFirestore,
+  subscribeMicrositesFromFirestore,
+  subscribeLinksFromFirestore,
 } from '@/lib/firebase/firestore';
 import { AbuseReport, AuditLog, User, ShortLink, Microsite } from '@/types';
 import { formatDate, formatNumber } from '@/lib/utils';
@@ -128,16 +130,32 @@ export default function AdminDashboardPage() {
     });
 
     // 2. Berlangganan (subscribe) real-time event pengguna baru dari Firestore
-    const unsubscribe = subscribeUsersFromFirestore((liveUsers) => {
+    const unsubscribeUsers = subscribeUsersFromFirestore((liveUsers) => {
       if (liveUsers && liveUsers.length > 0) {
         setAllUsers(liveUsers);
+      }
+    });
+
+    // 3. Berlangganan (subscribe) real-time event microsites dari Firestore
+    const unsubscribeMicrosites = subscribeMicrositesFromFirestore((liveSites) => {
+      if (liveSites) {
+        setMicrosites(liveSites);
+      }
+    });
+
+    // 4. Berlangganan (subscribe) real-time event links dari Firestore
+    const unsubscribeLinks = subscribeLinksFromFirestore((liveLinks) => {
+      if (liveLinks) {
+        setLinks(liveLinks);
       }
     });
 
     window.addEventListener('mfy_storage_update', loadAdminData);
     return () => {
       window.removeEventListener('mfy_storage_update', loadAdminData);
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeUsers) unsubscribeUsers();
+      if (unsubscribeMicrosites) unsubscribeMicrosites();
+      if (unsubscribeLinks) unsubscribeLinks();
     };
   }, []);
 
@@ -352,9 +370,15 @@ export default function AdminDashboardPage() {
           <p className="text-2xl font-black text-slate-900 dark:text-white mt-2">
             {microsites.filter((m) => m.status === 'PUBLISHED').length}
           </p>
-          <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold mt-1 block">
-            {microsites.length} Total dibuat
-          </span>
+          <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+            <span className="text-amber-600 dark:text-amber-400 font-bold">
+              👑 {microsites.filter((m) => m.ownerRole === 'ADMIN' || m.ownerRole === 'SUPER_ADMIN' || m.ownerEmail?.toLowerCase() === 'alfyarnaim@gmail.com').length} Admin
+            </span>
+            <span>·</span>
+            <span className="text-blue-600 dark:text-blue-400 font-bold">
+              👤 {microsites.filter((m) => !(m.ownerRole === 'ADMIN' || m.ownerRole === 'SUPER_ADMIN' || m.ownerEmail?.toLowerCase() === 'alfyarnaim@gmail.com')).length} Member
+            </span>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-[#0F172A] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">

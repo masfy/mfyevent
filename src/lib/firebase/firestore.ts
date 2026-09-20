@@ -11,6 +11,8 @@ import {
   where,
   orderBy,
   deleteDoc,
+  updateDoc,
+  increment,
   Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseFirestore, isFirebaseConfigured, PRIMARY_ADMIN_EMAIL } from './config';
@@ -313,6 +315,22 @@ export const deleteLinkFromFirestore = async (slug: string): Promise<boolean> =>
   }
 };
 
+export const recordLinkClickInFirestore = async (slug: string): Promise<void> => {
+  if (!isFirebaseConfigured()) return;
+  const db = getFirebaseFirestore();
+  if (!db) return;
+  try {
+    const clean = slug.trim().toLowerCase();
+    const docRef = doc(db, 'links', clean);
+    await updateDoc(docRef, {
+      'metrics.totalClicks': increment(1),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch {
+    // ignore
+  }
+};
+
 export const fetchLinksFromFirestore = async (): Promise<ShortLink[]> => {
   if (!isFirebaseConfigured()) return getStoredLinks();
   const db = getFirebaseFirestore();
@@ -320,24 +338,51 @@ export const fetchLinksFromFirestore = async (): Promise<ShortLink[]> => {
 
   try {
     const snap = await getDocs(collection(db, 'links'));
-    const localLinks = getStoredLinks();
-    if (snap.empty) return localLinks;
+    if (snap.empty) {
+      saveStoredLinks([]);
+      return [];
+    }
 
     const cloudLinks: ShortLink[] = [];
     snap.forEach((d) => {
       cloudLinks.push(d.data() as ShortLink);
     });
 
-    const map = new Map<string, ShortLink>();
-    localLinks.forEach((l) => map.set(l.slug.toLowerCase(), l));
-    cloudLinks.forEach((l) => map.set(l.slug.toLowerCase(), l));
-
-    const merged = Array.from(map.values());
-    saveStoredLinks(merged);
-    return merged;
+    saveStoredLinks(cloudLinks);
+    return cloudLinks;
   } catch (error) {
     console.warn('Gagal mengambil links dari Firestore:', error);
     return getStoredLinks();
+  }
+};
+
+export const subscribeLinksFromFirestore = (
+  onLinksUpdate: (links: ShortLink[]) => void
+): Unsubscribe | null => {
+  if (!isFirebaseConfigured()) return null;
+  const db = getFirebaseFirestore();
+  if (!db) return null;
+
+  try {
+    const linksCol = collection(db, 'links');
+    const unsubscribe = onSnapshot(
+      linksCol,
+      (snap) => {
+        const cloudLinks: ShortLink[] = [];
+        snap.forEach((docSnap) => {
+          cloudLinks.push(docSnap.data() as ShortLink);
+        });
+        saveStoredLinks(cloudLinks);
+        onLinksUpdate(cloudLinks);
+      },
+      (error) => {
+        console.warn('Error pada listener links Firestore:', error);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Gagal menginisialisasi listener Firestore links:', err);
+    return null;
   }
 };
 
@@ -554,25 +599,119 @@ export const fetchMicrositesFromFirestore = async (): Promise<Microsite[]> => {
 
   try {
     const snap = await getDocs(collection(db, 'microsites'));
-    const localSites = getStoredMicrosites();
-
-    if (snap.empty) return localSites;
+    if (snap.empty) {
+      saveStoredMicrosites([]);
+      return [];
+    }
 
     const cloudSites: Microsite[] = [];
     snap.forEach((d) => {
       cloudSites.push(d.data() as Microsite);
     });
 
-    // Merge: padukan data cloud dengan data lokal
-    const map = new Map<string, Microsite>();
-    localSites.forEach((s) => map.set(s.slug.toLowerCase(), s));
-    cloudSites.forEach((s) => map.set(s.slug.toLowerCase(), s));
-
-    const merged = Array.from(map.values());
-    saveStoredMicrosites(merged);
-    return merged;
+    saveStoredMicrosites(cloudSites);
+    return cloudSites;
   } catch (error) {
     console.warn('Gagal mengambil microsites dari Firestore:', error);
     return getStoredMicrosites();
+  }
+};
+
+/**
+ * Berlangganan (subscribe) real-time pembaruan seluruh microsite dari Cloud Firestore
+ */
+export const subscribeMicrositesFromFirestore = (
+  onMicrositesUpdate: (sites: Microsite[]) => void
+): Unsubscribe | null => {
+  if (!isFirebaseConfigured()) return null;
+  const db = getFirebaseFirestore();
+  if (!db) return null;
+
+  try {
+    const sitesCol = collection(db, 'microsites');
+    const unsubscribe = onSnapshot(
+      sitesCol,
+      (snap) => {
+        const cloudSites: Microsite[] = [];
+        snap.forEach((docSnap) => {
+          cloudSites.push(docSnap.data() as Microsite);
+        });
+        saveStoredMicrosites(cloudSites);
+        onMicrositesUpdate(cloudSites);
+      },
+      (error) => {
+        console.warn('Error pada listener microsites Firestore:', error);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Gagal menginisialisasi listener Firestore microsites:', err);
+    return null;
+  }
+};
+
+/**
+ * Berlangganan (subscribe) real-time data satu microsite berdasarkan slug untuk halaman publik /@slug
+ */
+export const subscribeMicrositeBySlug = (
+  slug: string,
+  onUpdate: (site: Microsite | null) => void
+): Unsubscribe | null => {
+  if (!slug) {
+    onUpdate(null);
+    return null;
+  }
+  const cleanSlug = slug.trim().toLowerCase().replace(/^@/, '');
+  if (!cleanSlug) {
+    onUpdate(null);
+    return null;
+  }
+
+  if (!isFirebaseConfigured()) {
+    const all = getStoredMicrosites();
+    onUpdate(all.find((s) => s.slug.toLowerCase() === cleanSlug) || null);
+    return null;
+  }
+
+  const db = getFirebaseFirestore();
+  if (!db) {
+    const all = getStoredMicrosites();
+    onUpdate(all.find((s) => s.slug.toLowerCase() === cleanSlug) || null);
+    return null;
+  }
+
+  try {
+    const docRef = doc(db, 'microsites', cleanSlug);
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          onUpdate(docSnap.data() as Microsite);
+        } else {
+          // Coba fallback query jika dokumen disimpan dengan custom ID
+          const q = query(collection(db, 'microsites'), where('slug', '==', cleanSlug));
+          getDocs(q)
+            .then((querySnap) => {
+              if (!querySnap.empty) {
+                onUpdate(querySnap.docs[0].data() as Microsite);
+              } else {
+                onUpdate(null);
+              }
+            })
+            .catch(() => {
+              onUpdate(null);
+            });
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] Error snapshot microsite by slug:', error);
+        fetchMicrositeBySlug(cleanSlug).then(onUpdate).catch(() => onUpdate(null));
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[Firestore] Gagal subscribe microsite by slug:', err);
+    fetchMicrositeBySlug(cleanSlug).then(onUpdate).catch(() => onUpdate(null));
+    return null;
   }
 };

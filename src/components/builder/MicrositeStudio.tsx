@@ -5,7 +5,7 @@ import { Microsite, MicrositeBlock, PrebuiltThemeId, BlockType, ButtonVariant } 
 import { PREBUILT_THEMES } from '@/lib/mockData';
 import { PublicMicrositeView } from '@/components/microsite/PublicMicrositeView';
 import { useToast } from '@/components/ui/Toast';
-import { saveStoredMicrosites, getStoredMicrosites } from '@/lib/storage';
+import { saveStoredMicrosites, getStoredMicrosites, getStoredUser } from '@/lib/storage';
 import { syncMicrositeToFirestore } from '@/lib/firebase/firestore';
 import { getFirebaseAuth } from '@/lib/firebase/config';
 import { normalizeSlug, isSlugReserved } from '@/lib/utils';
@@ -54,7 +54,15 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
   const { showToast } = useToast();
 
   // Active studio states
-  const [site, setSite] = useState<Microsite>(initialMicrosite);
+  const [site, setSite] = useState<Microsite>(() => {
+    const user = getStoredUser();
+    return {
+      ...initialMicrosite,
+      ownerEmail: initialMicrosite.ownerEmail || (initialMicrosite.ownerId === user.uid ? user.email : ''),
+      ownerName: initialMicrosite.ownerName || (initialMicrosite.ownerId === user.uid ? user.displayName : ''),
+      ownerRole: initialMicrosite.ownerRole || (initialMicrosite.ownerId === user.uid ? user.role : 'USER'),
+    };
+  });
   const [history, setHistory] = useState<Microsite[]>([initialMicrosite]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'content' | 'design' | 'settings' | 'seo'>('content');
@@ -74,13 +82,11 @@ export const MicrositeStudio: React.FC<MicrositeStudioProps> = ({ initialMicrosi
       const updated = allSites.map((s) => (s.id === site.id ? site : s));
       saveStoredMicrosites(updated);
 
-      // Jika statusnya PUBLISHED, sinkronkan ke cloud secara otomatis
-      if (site.status === 'PUBLISHED') {
-        try {
-          await syncMicrositeToFirestore(site);
-        } catch {
-          // ignore background autosave errors
-        }
+      // Selalu sinkronkan perubahan (termasuk hide/show item) langsung ke Cloud Firestore
+      try {
+        await syncMicrositeToFirestore(site);
+      } catch {
+        // ignore background autosave errors
       }
 
       setSaveStatus('SAVED');

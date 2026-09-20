@@ -24,6 +24,11 @@ import {
   toggleUserStoredLinkStatus,
   getStoredUser,
 } from '@/lib/storage';
+import {
+  fetchLinksFromFirestore,
+  deleteLinkFromFirestore,
+  subscribeLinksFromFirestore,
+} from '@/lib/firebase/firestore';
 import { getUserQuotaSummary } from '@/lib/quota';
 import { ShortLink, User } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
@@ -51,8 +56,22 @@ export default function LinksManagementPage() {
 
   useEffect(() => {
     loadData();
+
+    // Berlangganan real-time links dari Firestore
+    const unsubscribe = subscribeLinksFromFirestore((liveLinks) => {
+      const currentUser = getStoredUser();
+      if (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') {
+        setLinks(liveLinks);
+      } else {
+        setLinks(liveLinks.filter((l) => l.ownerId === currentUser?.uid));
+      }
+    });
+
     window.addEventListener('mfy_storage_update', loadData);
-    return () => window.removeEventListener('mfy_storage_update', loadData);
+    return () => {
+      window.removeEventListener('mfy_storage_update', loadData);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const quota = getUserQuotaSummary(user, links.length, 0);
@@ -81,8 +100,13 @@ export default function LinksManagementPage() {
 
   const handleDelete = (id: string, title: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus short link "${title}"?`)) {
+      const target = links.find((l) => l.id === id);
       const success = deleteUserStoredLink(id, user);
       if (success) {
+        if (target) {
+          deleteLinkFromFirestore(target.slug).catch(() => {});
+        }
+        setLinks((prev) => prev.filter((l) => l.id !== id));
         showToast('Short link berhasil dihapus');
       }
     }

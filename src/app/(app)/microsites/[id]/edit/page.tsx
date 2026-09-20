@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, LayoutTemplate, ShieldAlert } from 'lucide-react';
 import { MicrositeStudio } from '@/components/builder/MicrositeStudio';
 import { getStoredMicrosites, getStoredUser } from '@/lib/storage';
-import { fetchMicrositesFromFirestore } from '@/lib/firebase/firestore';
+import { fetchMicrositesFromFirestore, fetchMicrositeBySlug } from '@/lib/firebase/firestore';
 import { isUserAdmin } from '@/lib/quota';
 import { Microsite } from '@/types';
 
@@ -21,41 +21,53 @@ export default function EditMicrositeStudioPage() {
   useEffect(() => {
     const user = getStoredUser();
     const isAdmin = isUserAdmin(user);
-    const allSites = getStoredMicrosites();
-    const found = allSites.find((s) => s.id === siteId || s.slug === siteId);
 
-    if (!found) {
-      fetchMicrositesFromFirestore()
-        .then((cloudSites) => {
-          const cloudFound = cloudSites.find((s) => s.id === siteId || s.slug === siteId);
-          if (cloudFound) {
-            if (!isAdmin && cloudFound.ownerId !== user.uid) {
-              setNotAuthorized(true);
-            } else {
-              setSite(cloudFound);
-            }
+    const loadSite = async () => {
+      setLoading(true);
+      // 1. Cek Firestore terlebih dahulu untuk memastikan data paling segar
+      try {
+        const cloudSite = await fetchMicrositeBySlug(siteId);
+        if (cloudSite) {
+          if (!isAdmin && cloudSite.ownerId !== user.uid) {
+            setNotAuthorized(true);
           } else {
-            setSite(null);
+            setSite(cloudSite);
           }
-        })
-        .catch(() => {
-          setSite(null);
-        })
-        .finally(() => {
           setLoading(false);
-        });
-      return;
-    }
+          return;
+        }
 
-    // Security Authorization Check (BOLA Protection)
-    if (!isAdmin && found.ownerId !== user.uid) {
-      setNotAuthorized(true);
+        const cloudSites = await fetchMicrositesFromFirestore();
+        const cloudFound = cloudSites.find((s) => s.id === siteId || s.slug === siteId);
+        if (cloudFound) {
+          if (!isAdmin && cloudFound.ownerId !== user.uid) {
+            setNotAuthorized(true);
+          } else {
+            setSite(cloudFound);
+          }
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Gagal memuat microsite dari cloud:', err);
+      }
+
+      // 2. Fallback ke cache lokal
+      const allSites = getStoredMicrosites();
+      const localFound = allSites.find((s) => s.id === siteId || s.slug === siteId);
+      if (localFound) {
+        if (!isAdmin && localFound.ownerId !== user.uid) {
+          setNotAuthorized(true);
+        } else {
+          setSite(localFound);
+        }
+      } else {
+        setSite(null);
+      }
       setLoading(false);
-      return;
-    }
+    };
 
-    setSite(found);
-    setLoading(false);
+    loadSite();
   }, [siteId]);
 
   if (loading) {

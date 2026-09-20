@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getStoredLinks, saveStoredLinks, getStoredMicrosites, saveStoredMicrosites } from '@/lib/storage';
-import { INITIAL_LINKS, INITIAL_MICROSITES } from '@/lib/mockData';
-import { fetchMicrositeBySlug, fetchLinkBySlug } from '@/lib/firebase/firestore';
+import { getStoredLinks, getStoredMicrosites } from '@/lib/storage';
+import {
+  fetchMicrositeBySlug,
+  fetchLinkBySlug,
+  subscribeMicrositeBySlug,
+  recordLinkClickInFirestore,
+} from '@/lib/firebase/firestore';
 import { ShortLink, Microsite } from '@/types';
 import Link from 'next/link';
 import { ExternalLink, AlertCircle, Clock, Ban, ArrowRight } from 'lucide-react';
@@ -27,56 +31,28 @@ export default function ShortLinkRedirectPage() {
     // 1. Kasus A: Akses Microsite dengan awalan @ (misal: /@digi-hsu atau /@masalfy)
     if (decoded.startsWith('@')) {
       const msSlug = decoded.substring(1);
-      const allSites = getStoredMicrosites();
-      const localSite =
-        allSites.find((s) => s.slug.toLowerCase() === msSlug) ||
-        INITIAL_MICROSITES.find((s) => s.slug.toLowerCase() === msSlug);
+      setLoading(true);
 
-      if (localSite) {
-        setMicrosite(localSite);
+      const unsubscribe = subscribeMicrositeBySlug(msSlug, (cloudSite) => {
+        setMicrosite(cloudSite);
         setLoading(false);
-      }
+      });
 
-      fetchMicrositeBySlug(msSlug)
-        .then((cloudSite) => {
-          if (cloudSite) {
-            setMicrosite(cloudSite);
-            const current = getStoredMicrosites();
-            saveStoredMicrosites([
-              cloudSite,
-              ...current.filter((s) => s.slug.toLowerCase() !== msSlug),
-            ]);
-          } else if (!localSite) {
-            setMicrosite(null);
-          }
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-      return;
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
 
     // 2. Kasus B: Akses Short Link atau Microsite tanpa @ (misal: /digi-hsu)
     const cleanSlug = decoded;
-    const allLinks = getStoredLinks();
-    const localLink =
-      allLinks.find((l) => l.slug.toLowerCase() === cleanSlug) ||
-      INITIAL_LINKS.find((l) => l.slug.toLowerCase() === cleanSlug);
+    setLoading(true);
 
     const handleLinkRedirect = (targetLink: ShortLink) => {
       setLink(targetLink);
       if (targetLink.status === 'ACTIVE') {
         const isExpired = targetLink.expiresAt && new Date(targetLink.expiresAt).getTime() < Date.now();
         if (!isExpired) {
-          try {
-            if (!targetLink.metrics) targetLink.metrics = { totalClicks: 0, uniqueVisitors: 0 };
-            targetLink.metrics.totalClicks = (targetLink.metrics.totalClicks || 0) + 1;
-            const updated = allLinks.map((l) => (l.id === targetLink.id ? targetLink : l));
-            saveStoredLinks(updated);
-          } catch {
-            // ignore
-          }
-
+          recordLinkClickInFirestore(targetLink.slug).catch(() => {});
           setRedirecting(true);
           const timer = setTimeout(() => {
             window.location.href = targetLink.destinationUrl;
@@ -86,13 +62,7 @@ export default function ShortLinkRedirectPage() {
       }
     };
 
-    if (localLink) {
-      handleLinkRedirect(localLink);
-      setLoading(false);
-      return;
-    }
-
-    // Cari di cloud: cek link terlebih dahulu, jika bukan link cek apakah ini microsite
+    // Ambil langsung dari Cloud Firestore terlebih dahulu
     fetchLinkBySlug(cleanSlug)
       .then(async (cloudLink) => {
         if (cloudLink) {
@@ -103,9 +73,16 @@ export default function ShortLinkRedirectPage() {
           if (cloudSite) {
             setMicrosite(cloudSite);
           } else {
-            const allSites = getStoredMicrosites();
-            const localSite = allSites.find((s) => s.slug.toLowerCase() === cleanSlug);
-            if (localSite) setMicrosite(localSite);
+            // Cek lokal sebagai opsi darurat jika offline
+            const allLinks = getStoredLinks();
+            const localLink = allLinks.find((l) => l.slug.toLowerCase() === cleanSlug);
+            if (localLink) {
+              handleLinkRedirect(localLink);
+            } else {
+              const allSites = getStoredMicrosites();
+              const localSite = allSites.find((s) => s.slug.toLowerCase() === cleanSlug);
+              if (localSite) setMicrosite(localSite);
+            }
           }
         }
       })

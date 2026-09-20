@@ -3,9 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { PublicMicrositeView } from '@/components/microsite/PublicMicrositeView';
-import { getStoredMicrosites, saveStoredMicrosites } from '@/lib/storage';
-import { fetchMicrositeBySlug, syncMicrositeToFirestore } from '@/lib/firebase/firestore';
-import { INITIAL_MICROSITES } from '@/lib/mockData';
+import { subscribeMicrositeBySlug } from '@/lib/firebase/firestore';
 import { Microsite } from '@/types';
 import Link from 'next/link';
 
@@ -19,47 +17,17 @@ export default function PublicMicrositePage() {
     if (!rawSlug) return;
     const cleanSlug = decodeURIComponent(rawSlug).toLowerCase().replace(/^@/, '');
 
-    // 1. Cek cache lokal terlebih dahulu (tampilan instan tanpa jeda loading)
-    const allSites = getStoredMicrosites();
-    const localFound =
-      allSites.find((s) => s.slug.toLowerCase() === cleanSlug) ||
-      INITIAL_MICROSITES.find((s) => s.slug.toLowerCase() === cleanSlug);
+    setLoading(true);
 
-    if (localFound) {
-      setMicrosite(localFound);
+    // Langganan pembaruan real-time langsung dari Cloud Firestore
+    const unsubscribe = subscribeMicrositeBySlug(cleanSlug, (liveSite) => {
+      setMicrosite(liveSite);
       setLoading(false);
+    });
 
-      // Otomatis coba sinkronkan data lokal ke Cloud Firestore
-      if (localFound.status === 'PUBLISHED') {
-        syncMicrositeToFirestore(localFound).catch(() => {});
-      }
-    }
-
-    // 2. Ambil versi resmi & terbaru dari Cloud Firestore
-    fetchMicrositeBySlug(cleanSlug)
-      .then((cloudSite) => {
-        if (cloudSite) {
-          setMicrosite(cloudSite);
-          // Simpan ke cache peramban agar akses berikutnya lebih cepat
-          const currentSites = getStoredMicrosites();
-          const updated = [
-            cloudSite,
-            ...currentSites.filter((s) => s.slug.toLowerCase() !== cleanSlug),
-          ];
-          saveStoredMicrosites(updated);
-        } else if (!localFound) {
-          setMicrosite(null);
-        }
-      })
-      .catch((err) => {
-        console.warn('[_microsite] Gagal memuat dari cloud Firestore:', err);
-        if (!localFound) {
-          setMicrosite(null);
-        }
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [rawSlug]);
 
   // Update Dynamic Document Title
