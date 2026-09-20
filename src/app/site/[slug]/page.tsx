@@ -13,21 +13,25 @@ export default function PublicMicrositePage() {
   const rawSlug = params.slug as string;
   const [microsite, setMicrosite] = useState<Microsite | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasRecordedRef = React.useRef(false);
 
   useEffect(() => {
     if (!rawSlug) return;
     const cleanSlug = decodeURIComponent(rawSlug).toLowerCase().replace(/^@/, '');
 
     setLoading(true);
-
-    // Catat views microsite (baik lokal maupun cloud)
-    recordStoredMicrositeView(cleanSlug);
-    recordMicrositeViewInFirestore(cleanSlug).catch(() => {});
+    hasRecordedRef.current = false;
 
     // Langganan pembaruan real-time langsung dari Cloud Firestore
     const unsubscribe = subscribeMicrositeBySlug(cleanSlug, (liveSite) => {
       setMicrosite(liveSite);
       setLoading(false);
+
+      if (liveSite && !hasRecordedRef.current) {
+        hasRecordedRef.current = true;
+        recordStoredMicrositeView(cleanSlug);
+        recordMicrositeViewInFirestore(cleanSlug, liveSite.id).catch(() => {});
+      }
     });
 
     return () => {

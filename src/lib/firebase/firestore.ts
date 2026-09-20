@@ -325,37 +325,24 @@ export const recordLinkClickInFirestore = async (slug: string, linkId?: string):
 
   try {
     const docRef = doc(db, 'links', clean);
-    await setDoc(
-      docRef,
-      {
-        metrics: {
-          totalClicks: increment(1),
-          uniqueVisitors: increment(1),
-        },
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    await updateDoc(docRef, {
+      'metrics.totalClicks': increment(1),
+      'metrics.uniqueVisitors': increment(1),
+      updatedAt: new Date().toISOString(),
+    });
     console.log(`[Firestore] Sukses mencatat klik untuk link /${clean}`);
     return true;
   } catch (error) {
-    console.warn('[Firestore] Gagal update klik langsung, mencoba query fallback:', error);
     try {
       const q = query(collection(db, 'links'), where('slug', '==', clean));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const targetDocRef = snap.docs[0].ref;
-        await setDoc(
-          targetDocRef,
-          {
-            metrics: {
-              totalClicks: increment(1),
-              uniqueVisitors: increment(1),
-            },
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
+        await updateDoc(targetDocRef, {
+          'metrics.totalClicks': increment(1),
+          'metrics.uniqueVisitors': increment(1),
+          updatedAt: new Date().toISOString(),
+        });
         return true;
       }
     } catch (err2) {
@@ -375,33 +362,24 @@ export const recordMicrositeViewInFirestore = async (slug: string, siteId?: stri
 
   try {
     const docRef = doc(db, 'microsites', clean);
-    await setDoc(
-      docRef,
-      {
-        views: increment(1),
-        uniqueVisitors: increment(1),
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    await updateDoc(docRef, {
+      views: increment(1),
+      uniqueVisitors: increment(1),
+      updatedAt: new Date().toISOString(),
+    });
     console.log(`[Firestore] Sukses mencatat view untuk microsite /@${clean}`);
     return true;
   } catch (error) {
-    console.warn('[Firestore] Gagal update view microsite langsung, mencoba query fallback:', error);
     try {
       const q = query(collection(db, 'microsites'), where('slug', '==', clean));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const targetDocRef = snap.docs[0].ref;
-        await setDoc(
-          targetDocRef,
-          {
-            views: increment(1),
-            uniqueVisitors: increment(1),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
+        await updateDoc(targetDocRef, {
+          views: increment(1),
+          uniqueVisitors: increment(1),
+          updatedAt: new Date().toISOString(),
+        });
         return true;
       }
     } catch (err2) {
@@ -585,19 +563,45 @@ export const fetchMicrositeBySlug = async (slug: string): Promise<Microsite | nu
     return all.find((s) => s.slug.toLowerCase() === cleanSlug) || null;
   }
 
+  const sanitizeSite = (data: any): Microsite | null => {
+    if (!data || (!data.title && !data.slug && !Array.isArray(data.blocks))) return null;
+    return {
+      ...data,
+      slug: data.slug || cleanSlug,
+      title: data.title || `@${cleanSlug}`,
+      status: data.status || 'PUBLISHED',
+      blocks: Array.isArray(data.blocks) ? data.blocks : [],
+      profile: data.profile || { name: data.title || cleanSlug, bio: '', verified: false },
+      theme: data.theme || {
+        id: 'default',
+        name: 'Default',
+        background: '#FFFFFF',
+        font: 'sans',
+        primaryColor: '#5B5BF7',
+        textColor: '#1E293B',
+        subtextColor: '#64748B',
+        cardBg: '#F8FAFC',
+        cardBorder: '#E2E8F0',
+        buttonVariant: 'rounded-xl',
+      },
+    };
+  };
+
   try {
     // 1. Coba ambil langsung berdasarkan doc ID (karena disimpan dengan id = cleanSlug)
     const docRef = doc(db, 'microsites', cleanSlug);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      return snap.data() as Microsite;
+      const site = sanitizeSite(snap.data());
+      if (site) return site;
     }
 
     // 2. Fallback query jika dokumen lama disimpan dengan ID custom
     const q = query(collection(db, 'microsites'), where('slug', '==', cleanSlug));
     const querySnap = await getDocs(q);
     if (!querySnap.empty) {
-      return querySnap.docs[0].data() as Microsite;
+      const site = sanitizeSite(querySnap.docs[0].data());
+      if (site) return site;
     }
 
     return null;
@@ -760,20 +764,48 @@ export const subscribeMicrositeBySlug = (
     return null;
   }
 
+  const sanitizeSite = (data: any): Microsite | null => {
+    if (!data || (!data.title && !data.slug && !Array.isArray(data.blocks))) return null;
+    return {
+      ...data,
+      slug: data.slug || cleanSlug,
+      title: data.title || `@${cleanSlug}`,
+      status: data.status || 'PUBLISHED',
+      blocks: Array.isArray(data.blocks) ? data.blocks : [],
+      profile: data.profile || { name: data.title || cleanSlug, bio: '', verified: false },
+      theme: data.theme || {
+        id: 'default',
+        name: 'Default',
+        background: '#FFFFFF',
+        font: 'sans',
+        primaryColor: '#5B5BF7',
+        textColor: '#1E293B',
+        subtextColor: '#64748B',
+        cardBg: '#F8FAFC',
+        cardBorder: '#E2E8F0',
+        buttonVariant: 'rounded-xl',
+      },
+    };
+  };
+
   try {
     const docRef = doc(db, 'microsites', cleanSlug);
     const unsubscribe = onSnapshot(
       docRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          onUpdate(docSnap.data() as Microsite);
+          const site = sanitizeSite(docSnap.data());
+          if (site) {
+            onUpdate(site);
+          }
         } else {
           // Coba fallback query jika dokumen disimpan dengan custom ID
           const q = query(collection(db, 'microsites'), where('slug', '==', cleanSlug));
           getDocs(q)
             .then((querySnap) => {
               if (!querySnap.empty) {
-                onUpdate(querySnap.docs[0].data() as Microsite);
+                const site = sanitizeSite(querySnap.docs[0].data());
+                onUpdate(site);
               } else {
                 onUpdate(null);
               }

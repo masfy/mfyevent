@@ -26,7 +26,24 @@ export const PublicMicrositeView: React.FC<PublicMicrositeViewProps> = ({
   microsite,
   previewMode = false,
 }) => {
-  const { profile, theme, blocks } = microsite;
+  const profile = microsite?.profile || {
+    name: microsite?.title || 'Microsite',
+    bio: '',
+    verified: false,
+  };
+  const theme = microsite?.theme || {
+    id: 'default',
+    name: 'Default',
+    background: '#FFFFFF',
+    font: 'sans',
+    primaryColor: '#5B5BF7',
+    textColor: '#1E293B',
+    subtextColor: '#64748B',
+    cardBg: '#F8FAFC',
+    cardBorder: '#E2E8F0',
+    buttonVariant: 'rounded-xl',
+  };
+  const blocks = Array.isArray(microsite?.blocks) ? microsite.blocks : [];
   const [copied, setCopied] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);

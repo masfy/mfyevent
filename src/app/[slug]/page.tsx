@@ -29,23 +29,27 @@ export default function ShortLinkRedirectPage() {
   const [microsite, setMicrosite] = useState<Microsite | null>(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const hasRecordedRef = React.useRef(false);
 
   useEffect(() => {
     if (!rawSlug) return;
     const decoded = decodeURIComponent(rawSlug).toLowerCase();
+    hasRecordedRef.current = false;
 
     // 1. Kasus A: Akses Microsite dengan awalan @ (misal: /@digi-hsu atau /@masalfy)
     if (decoded.startsWith('@')) {
       const msSlug = decoded.substring(1);
       setLoading(true);
 
-      // Catat view microsite
-      recordStoredMicrositeView(msSlug);
-      recordMicrositeViewInFirestore(msSlug).catch(() => {});
-
       const unsubscribe = subscribeMicrositeBySlug(msSlug, (cloudSite) => {
         setMicrosite(cloudSite);
         setLoading(false);
+
+        if (cloudSite && !hasRecordedRef.current) {
+          hasRecordedRef.current = true;
+          recordStoredMicrositeView(msSlug);
+          recordMicrositeViewInFirestore(msSlug, cloudSite.id).catch(() => {});
+        }
       });
 
       return () => {
