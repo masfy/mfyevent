@@ -233,10 +233,10 @@ export default function LinksManagementPage() {
                 <span>Dibuat {formatDate(link.createdAt)}</span>
                 <span>•</span>
                 <span className="font-semibold text-slate-700">
-                  {formatNumber(link.metrics.totalClicks)} Total Klik
+                  {formatNumber(link.metrics?.totalClicks || 0)} Total Klik
                 </span>
                 <span>•</span>
-                <span>{formatNumber(link.metrics.uniqueVisitors)} Visitors</span>
+                <span>{formatNumber(link.metrics?.uniqueVisitors || 0)} Visitors</span>
               </div>
             </div>
 

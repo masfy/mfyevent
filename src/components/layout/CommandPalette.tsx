@@ -204,7 +204,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       </p>
                     </div>
                     <span className="text-[11px] text-slate-400 shrink-0">
-                      {link.metrics.totalClicks} klik
+                      {link.metrics?.totalClicks ?? 0} klik
                     </span>
                   </button>
                 ))}
@@ -232,7 +232,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       </p>
                     </div>
                     <span className="text-[11px] text-slate-400 shrink-0">
-                      {site.views} views
+                      {site.views ?? 0} views
                     </span>
                   </button>
                 ))}

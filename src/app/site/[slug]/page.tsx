@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { PublicMicrositeView } from '@/components/microsite/PublicMicrositeView';
-import { subscribeMicrositeBySlug } from '@/lib/firebase/firestore';
+import { subscribeMicrositeBySlug, recordMicrositeViewInFirestore } from '@/lib/firebase/firestore';
+import { recordStoredMicrositeView } from '@/lib/storage';
 import { Microsite } from '@/types';
 import Link from 'next/link';
 
@@ -18,6 +19,10 @@ export default function PublicMicrositePage() {
     const cleanSlug = decodeURIComponent(rawSlug).toLowerCase().replace(/^@/, '');
 
     setLoading(true);
+
+    // Catat views microsite (baik lokal maupun cloud)
+    recordStoredMicrositeView(cleanSlug);
+    recordMicrositeViewInFirestore(cleanSlug).catch(() => {});
 
     // Langganan pembaruan real-time langsung dari Cloud Firestore
     const unsubscribe = subscribeMicrositeBySlug(cleanSlug, (liveSite) => {

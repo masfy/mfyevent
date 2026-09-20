@@ -59,8 +59,8 @@ export function isSlugReserved(slug: string): boolean {
   return RESERVED_SLUGS.includes(clean);
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('id-ID').format(num);
+export function formatNumber(num?: number | null): string {
+  return new Intl.NumberFormat('id-ID').format(Number(num) || 0);
 }
 
 export function formatDate(dateString: string): string {

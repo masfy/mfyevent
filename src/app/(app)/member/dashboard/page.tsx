@@ -99,8 +99,8 @@ export default function MemberDashboardPage() {
     };
   }, [router]);
 
-  const totalClicks = links.reduce((sum, l) => sum + l.metrics.totalClicks, 0);
-  const totalViews = microsites.reduce((sum, m) => sum + m.views, 0);
+  const totalClicks = links.reduce((sum, l) => sum + (l.metrics?.totalClicks || 0), 0);
+  const totalViews = microsites.reduce((sum, m) => sum + (m.views || 0), 0);
   const quota = getUserQuotaSummary(user, links.length, microsites.length);
 
   const handleOpenCreateLink = () => {

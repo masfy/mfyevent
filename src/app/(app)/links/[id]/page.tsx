@@ -18,6 +18,7 @@ import {
   Link2,
 } from 'lucide-react';
 import { getStoredLinks } from '@/lib/storage';
+import { fetchLinksFromFirestore, subscribeLinksFromFirestore } from '@/lib/firebase/firestore';
 import { ShortLink } from '@/types';
 import { formatNumber, formatDate } from '@/lib/utils';
 import { useToast } from '@/components/ui/Toast';
@@ -34,14 +35,48 @@ export default function LinkDetailPage() {
   const [showQr, setShowQr] = useState(false);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d');
 
+  const findLinkInList = (list: ShortLink[]) => {
+    return list.find((l) => l.id === linkId || l.slug === linkId);
+  };
+
   useEffect(() => {
+    // 1. Check local storage first
     const allLinks = getStoredLinks();
-    const found = allLinks.find((l) => l.id === linkId);
+    const found = findLinkInList(allLinks);
     if (found) {
       setLink(found);
-    } else if (allLinks.length > 0) {
-      setLink(allLinks[0]);
     }
+
+    // 2. Fetch from Firestore initially
+    fetchLinksFromFirestore().then((cloudLinks) => {
+      const cloudFound = findLinkInList(cloudLinks);
+      if (cloudFound) {
+        setLink(cloudFound);
+      }
+    });
+
+    // 3. Realtime subscribe to Firestore
+    const unsubscribe = subscribeLinksFromFirestore((liveLinks) => {
+      const liveFound = findLinkInList(liveLinks);
+      if (liveFound) {
+        setLink(liveFound);
+      }
+    });
+
+    const handleStorageUpdate = () => {
+      const updated = getStoredLinks();
+      const updatedFound = findLinkInList(updated);
+      if (updatedFound) {
+        setLink(updatedFound);
+      }
+    };
+
+    window.addEventListener('mfy_storage_update', handleStorageUpdate);
+
+    return () => {
+      window.removeEventListener('mfy_storage_update', handleStorageUpdate);
+      if (unsubscribe) unsubscribe();
+    };
   }, [linkId]);
 
   if (!link) {
@@ -137,7 +172,7 @@ export default function LinkDetailPage() {
             <MousePointerClick className="w-4 h-4 text-[#5B5BF7]" />
           </div>
           <p className="text-2xl font-black text-slate-900 mt-3">
-            {formatNumber(link.metrics.totalClicks)}
+            {formatNumber(link.metrics?.totalClicks ?? 0)}
           </p>
           <span className="text-[11px] text-slate-400 mt-0.5 block">Akumulasi seluruh klik</span>
         </div>
@@ -148,7 +183,7 @@ export default function LinkDetailPage() {
             <Users className="w-4 h-4 text-[#06B6D4]" />
           </div>
           <p className="text-2xl font-black text-slate-900 mt-3">
-            {formatNumber(link.metrics.uniqueVisitors)}
+            {formatNumber(link.metrics?.uniqueVisitors ?? 0)}
           </p>
           <span className="text-[11px] text-slate-400 mt-0.5 block">Pengunjung unik terverifikasi</span>
         </div>
@@ -159,7 +194,7 @@ export default function LinkDetailPage() {
             <Calendar className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-2xl font-black text-slate-900 mt-3">
-            +{formatNumber(Math.round(link.metrics.totalClicks * 0.12))}
+            +{formatNumber(Math.round((link.metrics?.totalClicks ?? 0) * 0.12))}
           </p>
           <span className="text-[11px] text-emerald-600 mt-0.5 block font-medium">
             Aktivitas stabil

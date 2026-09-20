@@ -315,19 +315,99 @@ export const deleteLinkFromFirestore = async (slug: string): Promise<boolean> =>
   }
 };
 
-export const recordLinkClickInFirestore = async (slug: string): Promise<void> => {
-  if (!isFirebaseConfigured()) return;
+export const recordLinkClickInFirestore = async (slug: string, linkId?: string): Promise<boolean> => {
+  if (!isFirebaseConfigured()) return false;
   const db = getFirebaseFirestore();
-  if (!db) return;
+  if (!db) return false;
+
+  const clean = slug.trim().toLowerCase();
+  if (!clean) return false;
+
   try {
-    const clean = slug.trim().toLowerCase();
     const docRef = doc(db, 'links', clean);
-    await updateDoc(docRef, {
-      'metrics.totalClicks': increment(1),
-      updatedAt: new Date().toISOString(),
-    });
-  } catch {
-    // ignore
+    await setDoc(
+      docRef,
+      {
+        metrics: {
+          totalClicks: increment(1),
+          uniqueVisitors: increment(1),
+        },
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    console.log(`[Firestore] Sukses mencatat klik untuk link /${clean}`);
+    return true;
+  } catch (error) {
+    console.warn('[Firestore] Gagal update klik langsung, mencoba query fallback:', error);
+    try {
+      const q = query(collection(db, 'links'), where('slug', '==', clean));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const targetDocRef = snap.docs[0].ref;
+        await setDoc(
+          targetDocRef,
+          {
+            metrics: {
+              totalClicks: increment(1),
+              uniqueVisitors: increment(1),
+            },
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        return true;
+      }
+    } catch (err2) {
+      console.warn('[Firestore] Gagal mencatat klik link via query fallback:', err2);
+    }
+    return false;
+  }
+};
+
+export const recordMicrositeViewInFirestore = async (slug: string, siteId?: string): Promise<boolean> => {
+  if (!isFirebaseConfigured()) return false;
+  const db = getFirebaseFirestore();
+  if (!db) return false;
+
+  const clean = slug.trim().toLowerCase().replace(/^@/, '');
+  if (!clean) return false;
+
+  try {
+    const docRef = doc(db, 'microsites', clean);
+    await setDoc(
+      docRef,
+      {
+        views: increment(1),
+        uniqueVisitors: increment(1),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    console.log(`[Firestore] Sukses mencatat view untuk microsite /@${clean}`);
+    return true;
+  } catch (error) {
+    console.warn('[Firestore] Gagal update view microsite langsung, mencoba query fallback:', error);
+    try {
+      const q = query(collection(db, 'microsites'), where('slug', '==', clean));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const targetDocRef = snap.docs[0].ref;
+        await setDoc(
+          targetDocRef,
+          {
+            views: increment(1),
+            uniqueVisitors: increment(1),
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        return true;
+      }
+    } catch (err2) {
+      console.warn('[Firestore] Gagal mencatat view microsite via query fallback:', err2);
+    }
+    return false;
   }
 };
 

@@ -116,6 +116,60 @@ export const saveStoredMicrosites = (microsites: Microsite[]) => {
 };
 
 /**
+ * Mencatat penambahan klik tautan pada penyimpanan lokal & memicu event update
+ */
+export const recordStoredLinkClick = (slugOrId: string) => {
+  if (typeof window === 'undefined' || !slugOrId) return;
+  try {
+    const all = getStoredLinks();
+    const clean = slugOrId.trim().toLowerCase();
+    const updated = all.map((l) => {
+      if (l.slug.toLowerCase() === clean || l.id === slugOrId) {
+        const metrics = l.metrics || { totalClicks: 0, uniqueVisitors: 0 };
+        return {
+          ...l,
+          metrics: {
+            ...metrics,
+            totalClicks: (metrics.totalClicks || 0) + 1,
+            uniqueVisitors: (metrics.uniqueVisitors || 0) + 1,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return l;
+    });
+    saveStoredLinks(updated);
+  } catch (err) {
+    console.warn('Gagal mencatat klik link lokal:', err);
+  }
+};
+
+/**
+ * Mencatat penambahan views microsite pada penyimpanan lokal & memicu event update
+ */
+export const recordStoredMicrositeView = (slugOrId: string) => {
+  if (typeof window === 'undefined' || !slugOrId) return;
+  try {
+    const all = getStoredMicrosites();
+    const clean = slugOrId.trim().toLowerCase().replace(/^@/, '');
+    const updated = all.map((m) => {
+      if (m.slug.toLowerCase() === clean || m.id === slugOrId) {
+        return {
+          ...m,
+          views: (m.views || 0) + 1,
+          uniqueVisitors: (m.uniqueVisitors || 0) + 1,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return m;
+    });
+    saveStoredMicrosites(updated);
+  } catch (err) {
+    console.warn('Gagal mencatat views microsite lokal:', err);
+  }
+};
+
+/**
  * Memeriksa apakah user memiliki hak akses Admin
  */
 export const checkIsAdmin = (user?: User | null): boolean => {

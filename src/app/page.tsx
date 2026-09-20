@@ -32,6 +32,7 @@ import { PublicMicrositeView } from '@/components/microsite/PublicMicrositeView'
 import { LANDING_DEMO_MICROSITE } from '@/lib/mockData';
 import { useToast } from '@/components/ui/Toast';
 import { isUserLoggedIn, getStoredLinks, saveStoredLinks } from '@/lib/storage';
+import { syncLinkToFirestore } from '@/lib/firebase/firestore';
 import { useTheme } from '@/context/ThemeContext';
 import { ShortLink } from '@/types';
 import { QRCodeModal } from '@/components/qr/QRCodeModal';
@@ -159,6 +160,7 @@ export default function LandingPage() {
     const existingLinks = getStoredLinks();
     const filtered = existingLinks.filter((l) => l.slug.toLowerCase() !== chosenSlug);
     saveStoredLinks([newLink, ...filtered]);
+    syncLinkToFirestore(newLink).catch(() => {});
 
     setTimeout(() => {
       setDemoSlug(chosenSlug);

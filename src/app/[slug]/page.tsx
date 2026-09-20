@@ -2,12 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getStoredLinks, getStoredMicrosites } from '@/lib/storage';
+import {
+  getStoredLinks,
+  getStoredMicrosites,
+  recordStoredLinkClick,
+  recordStoredMicrositeView,
+} from '@/lib/storage';
 import {
   fetchMicrositeBySlug,
   fetchLinkBySlug,
   subscribeMicrositeBySlug,
   recordLinkClickInFirestore,
+  recordMicrositeViewInFirestore,
 } from '@/lib/firebase/firestore';
 import { ShortLink, Microsite } from '@/types';
 import Link from 'next/link';
@@ -33,6 +39,10 @@ export default function ShortLinkRedirectPage() {
       const msSlug = decoded.substring(1);
       setLoading(true);
 
+      // Catat view microsite
+      recordStoredMicrositeView(msSlug);
+      recordMicrositeViewInFirestore(msSlug).catch(() => {});
+
       const unsubscribe = subscribeMicrositeBySlug(msSlug, (cloudSite) => {
         setMicrosite(cloudSite);
         setLoading(false);
@@ -47,17 +57,28 @@ export default function ShortLinkRedirectPage() {
     const cleanSlug = decoded;
     setLoading(true);
 
-    const handleLinkRedirect = (targetLink: ShortLink) => {
+    const handleLinkRedirect = async (targetLink: ShortLink) => {
       setLink(targetLink);
       if (targetLink.status === 'ACTIVE') {
         const isExpired = targetLink.expiresAt && new Date(targetLink.expiresAt).getTime() < Date.now();
         if (!isExpired) {
-          recordLinkClickInFirestore(targetLink.slug).catch(() => {});
           setRedirecting(true);
-          const timer = setTimeout(() => {
-            window.location.href = targetLink.destinationUrl;
-          }, 800);
-          return () => clearTimeout(timer);
+
+          // 1. Catat klik di penyimpanan lokal agar dasbor lokal langsung ter-update
+          recordStoredLinkClick(targetLink.slug);
+
+          // 2. Kirim update ke Cloud Firestore & tunggu sebentar sebelum redirect
+          try {
+            await Promise.race([
+              recordLinkClickInFirestore(targetLink.slug, targetLink.id),
+              new Promise((resolve) => setTimeout(resolve, 500)),
+            ]);
+          } catch (err) {
+            console.warn('[ShortLinkRedirect] Error recording click:', err);
+          }
+
+          // 3. Alihkan pengunjung ke URL tujuan
+          window.location.href = targetLink.destinationUrl;
         }
       }
     };
@@ -72,6 +93,8 @@ export default function ShortLinkRedirectPage() {
           const cloudSite = await fetchMicrositeBySlug(cleanSlug);
           if (cloudSite) {
             setMicrosite(cloudSite);
+            recordStoredMicrositeView(cleanSlug);
+            recordMicrositeViewInFirestore(cleanSlug, cloudSite.id).catch(() => {});
           } else {
             // Cek lokal sebagai opsi darurat jika offline
             const allLinks = getStoredLinks();
@@ -81,7 +104,10 @@ export default function ShortLinkRedirectPage() {
             } else {
               const allSites = getStoredMicrosites();
               const localSite = allSites.find((s) => s.slug.toLowerCase() === cleanSlug);
-              if (localSite) setMicrosite(localSite);
+              if (localSite) {
+                setMicrosite(localSite);
+                recordStoredMicrositeView(cleanSlug);
+              }
             }
           }
         }
